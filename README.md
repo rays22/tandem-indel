@@ -1,2 +1,2 @@
 # tandem-indel
-Tandem insertions and repeat reductions
+Tandem insertions and repeat reductions in genomes.
