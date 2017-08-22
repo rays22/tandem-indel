@@ -3,7 +3,7 @@
 """ Read-in DNA sequence - one chromosome at a time. Soft repeat-masked fasta file: repeat sequences are in lower case. """
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.1"
+__version__ = "0.2"
 
 #################################################################
 # Import command-line parsing module from the Python standard library.
@@ -29,64 +29,112 @@ parser.add_argument('-z', '--gzip', help='use gzip compressed input file', actio
 
 args = parser.parse_args()
 
-#if args.gzip:
-#    print('compressed input file')
-#else:
-#    print('uncompressed input file')
-
+# Is is a gzip compressed fasta file? 
+compressedFasta = args.gzip
 
 ######################################################################
 
-# input filename
+# input filename and path
 fname = args.input_file
+
+######################################################################
+########                    Functions                        #########
 ######################################################################
 
-# initialise a tuple for chromosome sequence
-chromosome = tuple()
+def readFasta( pathToFile, isCompressed):
+    """Read-in DNA sequence from fasta format file and return a record as a tuple of two strings, the title line (everything after the > character) and the sequence (as a plain string. Note that only the first sequence record in the input file is processed."""
+
+    # initialise a tuple for chromosome sequence
+    seqRecord = tuple()
+#   print('UNCOMPRESSED?', isCompressed)
+
+    try:
+        if isCompressed:
+            with gzip.open(pathToFile, 'rt') as handle:
+#for testing#   print('Compressed')
+                count = 0
+                total_len = 0
+                for title, seq in SimpleFastaParser(handle):
+                    if count < 1:
+                        seqRecord = (title, seq.upper()) 
+                        total_len += len(seq)
+                    count += 1
+                    if count > 1:
+                        print('WARNING: more than one sequence in fasta file!')
+                return(seqRecord)
+        else:
+            with open(fname, 'rt') as handle:
+#for testing#   print('Uncompressed')
+                count = 0
+                total_len = 0
+                for title, seq in SimpleFastaParser(handle):
+                    if count < 1:
+                        seqRecord = (title, seq.upper()) 
+                        total_len += len(seq)
+                    count += 1
+                    if count > 1:
+                        print('WARNING: more than one sequence in fasta file!')
+                return(seqRecord)
+    except Exception as e:
+        print(e)
+        raise SystemExit
+
+
+def fetchCompareSeq( refSequence, givePosition, yourSequence):
+    """Fetch a short subset from your reference DNA sequence starting from the start coordinate you provide and compare the fetched reference sequence to the short DNA sequence that you provide."""
+
+    seq = refSequence
+    pos1 = givePosition
+    nt = yourSequence
+    yourSeqLength = len(yourSequence)
+    if nt == seq[ (pos1-1): (pos1-1+yourSeqLength) ]:
+        print('OK, match at position:', pos1, '\t', nt, seq[ (pos1-1): (pos1-1+yourSeqLength) ] )
+    else:
+        print('mismatch at position:', pos1, '\t', nt, seq[ (pos1-1): (pos1-1+yourSeqLength) ] )
 
 #################################################################
 # Read in a data file.
 #################################################################
-
-
-try:
-    if args.gzip:
-        with gzip.open(fname, 'rt') as handle:
-#           print('Compressed')
-            count = 0
-            total_len = 0
-            for title, seq in SimpleFastaParser(handle):
-                if count < 1:
-                    chromosome = (title, seq.upper()) 
-                    total_len += len(seq)
-                count += 1
-    else:
-        with open(fname, 'rt') as handle:
-#           print('Uncompressed')
-            count = 0
-            total_len = 0
-            for title, seq in SimpleFastaParser(handle):
-                if count < 1:
-                    chromosome = (title, seq.upper()) 
-                    total_len += len(seq)
-                count += 1
-except Exception as e:
-    print(e)
-
-#print( title, '\t', 'Length: %i nt.' % (total_len) )
-
-if count < 2:
-    print( chromosome[0], '\t', 'Length: %i nt.' % (total_len) )
-#   print( chromosome[0], chromosome[1] )
+testSeq = readFasta(fname, compressedFasta)
+print ('Sequence name:', testSeq[0], sep = '\t')
+if len(testSeq[1]) > 1000000:
+    print ('length:', len(testSeq[1])/1000000, 'Mbp')
 else:
-    print('WARNING: only the first record in the input file was considered!')
-    print( chromosome[0], '\t', 'Length: %i nt.' % (total_len) )
+    print ('\tlength:', len(testSeq[1]), 'bp')
 
-if len(chromosome[1]) > 70:
-    print(''.join( [chromosome[1][:70], '...']) )
+#################################################################
+### validating sequence position
+#################################################################
+fetchCompareSeq( testSeq[1], 5, 'ACG')
+fetchCompareSeq( testSeq[1], 6, 'CG')
+fetchCompareSeq( testSeq[1], 7, 'G')
+fetchCompareSeq( testSeq[1], 8, 'G')
+
+#################################################################
+#################################################################
+#################################################################
+
+if len(testSeq[1]) > 70:
+    print(''.join( [testSeq[1][:70], '...']) )
 else:
-    print(chromosome[1])
+    print(testSeq[1])
 
+### validating sequence position
+
+
+#pos1 = 5
+#nt = 'ACG'
+#insLen = len(nt)
+#seq = testSeq[1]
+#if nt == seq[ (pos1-1): (pos1-1+insLen) ]:
+#    print('OK, match at position:', pos1, '\t', nt, seq[ (pos1-1): (pos1-1+insLen) ] )
+#else:
+#    print('mismatch at position:', pos1, '\t', nt, seq[ (pos1-1): (pos1-1+insLen) ] )
+#
+#
+#################################################################
+#################################################################
+#################################################################
 
 # Store your data in a list of lists
 data = list()
