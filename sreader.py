@@ -56,7 +56,7 @@ def readFasta( pathToFile, isCompressed):
                 total_len = 0
                 for title, seq in SimpleFastaParser(handle):
                     if count < 1:
-                        seqRecord = (title, seq.upper()) 
+                        seqRecord = (title, seq.upper()) # NOTE: convert to uniform upper case.
                         total_len += len(seq)
                     count += 1
                     if count > 1:
@@ -69,7 +69,7 @@ def readFasta( pathToFile, isCompressed):
                 total_len = 0
                 for title, seq in SimpleFastaParser(handle):
                     if count < 1:
-                        seqRecord = (title, seq.upper()) 
+                        seqRecord = (title, seq.upper()) # # NOTE: convert to uniform upper case.
                         total_len += len(seq)
                     count += 1
                     if count > 1:
@@ -81,8 +81,7 @@ def readFasta( pathToFile, isCompressed):
 
 
 def fetchCompareSeq( refSequence, givePosition, yourSequence):
-    """Fetch a short subset from your reference DNA sequence starting from the start coordinate you provide and compare the fetched reference sequence to the short DNA sequence that you provide."""
-
+    """Fetch a short subset from your reference DNA sequence starting from the start coordinate you provide and compare the fetched reference sequence to the short DNA sequence that you provide. Following VCF-style nucleotide numbering with the 1st base having position 1."""
     seq = refSequence
     pos1 = givePosition
     nt = yourSequence
