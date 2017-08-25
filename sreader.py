@@ -63,7 +63,7 @@ def readFasta( pathToFile, isCompressed):
                         print('WARNING: more than one sequence in fasta file!')
                 return(seqRecord)
         else:
-            with open(fname, 'rt') as handle:
+            with open(pathToFile, 'rt') as handle:
 #for testing#   print('Uncompressed')
                 count = 0
                 total_len = 0

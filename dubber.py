@@ -27,7 +27,7 @@ group1.add_argument('-t', '--tab', help='Use tab as column separator.', action='
 # 2. Optional, but mutually exclusive user options:
 group2 = parser.add_mutually_exclusive_group()
 group2.add_argument('-37', '--grch37', help='Use GRCh37 coordinates (default).', action='store_true')
-group2.add_argument('-38', '--grch38', help='Use GRCh37 coordinates.', action='store_true')
+group2.add_argument('-38', '--grch38', help='Use GRCh38 coordinates.', action='store_true')
 
 # 3. Optional, but mutually exclusive user options:
 group3 = parser.add_mutually_exclusive_group()
