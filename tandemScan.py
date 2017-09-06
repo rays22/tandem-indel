@@ -43,8 +43,6 @@ genomeFilePath = args.reference_genome # get reference genome fasta file path fr
 
 ######################################################################
 ######    testing    #################################################
-### hardcoded for testing ###
-isFastaCompressed = True
 
 #fname = '/Volumes/rs22/pancancer-R/example-files/24f887e1-ce82-40f3-9674-11102bd076c0.broad-snowman.20150918.somatic.indel.vcf.gz'
 #fname = 'original.vcf.gz'
