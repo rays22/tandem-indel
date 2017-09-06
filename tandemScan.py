@@ -42,18 +42,6 @@ fname = args.vcf_file
 genomeFilePath = args.reference_genome # get reference genome fasta file path from user input
 
 ######################################################################
-######    testing    #################################################
-
-#fname = '/Volumes/rs22/pancancer-R/example-files/24f887e1-ce82-40f3-9674-11102bd076c0.broad-snowman.20150918.somatic.indel.vcf.gz'
-#fname = 'original.vcf.gz'
-#fname = 'testdata/svcp-test.vcf.gz'
-#fname = 'testdata/dkfz-test.vcf.gz'
-#fname = 'testdata/consensus-test.vcf.gz'
-##fname = 'testdata/vcf-testfile.vcf.gz' # binary garbage: BECAUSE out/out2.vcf:      POSIX tar archive
-#fname = 'testdata/broad-test.vcf.gz' # end-of-line might be different than in other test files?
-######               #################################################
-######################################################################
-######################################################################
 
 ######################################################################
 ########                    Functions                        #########
@@ -113,6 +101,8 @@ def mutTyperVCF(refA, altA):
 
     if refA == altA:
         mut_type = 'ERROR: unexpected data format' # this is not a mutation
+    elif altA == 'NONE':
+        mut_type = 'NA: monomorphic reference' # this is not a mutation
     elif len(refA) == len(altA):
         if len(refA) > 1:
             mut_type = mnv # multiple-nucleotide substitution
@@ -146,30 +136,6 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
         validated = True
 
     return(validated) 
-
-#def scan5prime(chromosomeID, genomicPosition, testAllele):
-#
-#    """Scan insertion or deletion site for tandem repeats in the 5-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The testAllele is a short nt sequence."""
-#
-#
-#    if vcfPosValidator(chromosomeID, genomicPosition, testAllele):
-#        genomicPosition -= 1
-#        return(scan5prime( chromosomeID, genomicPosition, testAllele ))
-#    else:
-#        return( genomicPosition - len(testAllele) ) # returns position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
-#        
-#
-#def scan3prime(chromosomeID, genomicPosition, testAllele):
-#
-#    """Scan insertion or deletion site for tandem repeats in the 3-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The testAllele is a short nt sequence."""
-#
-#
-#    if vcfPosValidator(chromosomeID, genomicPosition, testAllele):
-#        genomicPosition += 1
-#        return(scan3prime( chromosomeID, genomicPosition, testAllele ))
-#    else:
-#        return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
-#
 
 
 def repeatScan(chromosomeID, genomicPosition, repeatUnit):
@@ -207,6 +173,7 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
 #   print ('Tandem-test 4:\t', 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' )  # for testing
     print ( 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
+######################################################################
 
 def parseVCF( vcfFile ):
 
@@ -235,79 +202,27 @@ def parseVCF( vcfFile ):
     try:
        for record in vcf_reader:
             for n in record.ALT:
-#               print( str(record.REF).upper(), str(n).upper(), '\t-->' )
                 ref = str(record.REF).upper()
+                if ref.find(',') > -1 :
+                    raise ValueError ('ERROR: can not handle multiple reference alleles in VCFs', str(record) )
                 alt = str(n).upper()
-#               print(mutTyperVCF(ref, alt))
+                pos = record.POS
+                mutType = mutTyperVCF(ref, alt)
+#               if mutation type
+                print(pos, ref, alt, mutType)
 
-######### for one record ##
-#        rec1 = next(vcf_reader)
-#        for n in rec1.ALT:
-#            print( str(rec1.REF).upper(), str(n).upper() )
-#            ref = str(rec1.REF).upper()
-#            alt = str(n).upper()
-#            if ref.startswith(alt):
-#                ref = ref.lstrip(alt)
-#                print(ref, '-', 'DEL')
-#            if alt.startswith(ref):
-#                ref = alt.lstrip(ref)
-#                print('-', ref, 'INS')
-###########################
-#       for record in vcf_reader:
-#           for n in record.ALT:
-#               print( str(n).upper() )
-#               print(type(record), record)
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
         raise SystemExit
     ### Trim common suffix
     # Trim a list of sequences by removing the longest common suffix while leaving all of them at least one character in length.
 
+
+
+
+
 ######################################################################
 ######    testing    #################################################
-
-
-#refGenome = readRefGenome( genomeFilePath, True )
-#refGenome = refGenomeRecord
-#print('\nTesting reference genome parsing. Chromosomes to follow:')
-#for keys in refGenome:
-#    print ('\t', keys)
-#print('\n')
-
-#toTest = ( 'MT', 66, 'g')
-#toTest = ( 'MT', 66, 'gg')
-#toTest = ( 'MT', 68, 'gg')
-#toTest = ( 'MT', 70, 'gg')
-##toTest = ( 'MT', 69, 'gg')
-#toTest = ( 'MT', 305, 'cc')
-#toTest = ( 'MT', 303, 'c')
-#
-#toTest = ( 'MT', 69, 'gg')
-#toTest = ( 'MT', 68, 'gg')
-#toTest = ( 'MT', 305, 'cc')
-#toTest = ( 'MT', 68, 'ggg')
-#toTest = ( 'MT', 69, 'gg')
-#
-#if vcfPosValidator( toTest[0], toTest[1], toTest[2] ):
-#    print( 'validated', toTest )
-#else:
-#    print('failed validation', toTest )
-#### 
-##repeatUnit = toTest[2].upper()
-##startG = scan5prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit)
-##endG = scan3prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit) -1
-###print('startG:', startG)
-###print('endG:', endG)
-##repeatCount = int((endG-startG) / len(repeatUnit))
-##endP = startG + len(repeatUnit) * repeatCount 
-##print ('Tandem-test 1:', toTest[0], ':', startG, endP, endG, repeatUnit, '*', repeatCount ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
-##print ('Tandem-test 2:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount, ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
-##
-##print(type(refGenomeRecord))
-##repeatCount2 = refGenomeRecord[toTest[0]][(startG) : (endG) ]
-##print( repeatCount2, repeatCount2.count(repeatUnit), repeatCount)
-##
-##print ('Tandem-test 3:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount2.count(repeatUnit), ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 print('\n')
 repeatScan( 'MT', 69, 'gg')
