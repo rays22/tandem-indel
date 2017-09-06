@@ -133,7 +133,7 @@ refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genom
 
 def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
-    """Validate reference allele sequence and position. The refGenomeRecord argument should refer to a dictionary of chromosome or contig names as keys and the corresponding sequences as values (uppercase strings). Nucleotide numbering 1st base having position 1.."""
+    """Validate reference allele sequence and position. The refGenomeRecord argument should refer to a dictionary of chromosome or contig names as keys and the corresponding sequences as values (uppercase strings). Nucleotide numbering: 1st base having position 1."""
 
     validated = False # set default value
 
@@ -147,34 +147,65 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
     return(validated) 
 
-def scan5prime(chromosomeID, genomicPosition, refAllele):
+#def scan5prime(chromosomeID, genomicPosition, testAllele):
+#
+#    """Scan insertion or deletion site for tandem repeats in the 5-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The testAllele is a short nt sequence."""
+#
+#
+#    if vcfPosValidator(chromosomeID, genomicPosition, testAllele):
+#        genomicPosition -= 1
+#        return(scan5prime( chromosomeID, genomicPosition, testAllele ))
+#    else:
+#        return( genomicPosition - len(testAllele) ) # returns position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
+#        
+#
+#def scan3prime(chromosomeID, genomicPosition, testAllele):
+#
+#    """Scan insertion or deletion site for tandem repeats in the 3-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The testAllele is a short nt sequence."""
+#
+#
+#    if vcfPosValidator(chromosomeID, genomicPosition, testAllele):
+#        genomicPosition += 1
+#        return(scan3prime( chromosomeID, genomicPosition, testAllele ))
+#    else:
+#        return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
+#
 
-    """Scan insertion or deletion site for 5-prime repeats. It requires a 1-nt based genomic position as argument. """
+
+def repeatScan(chromosomeID, genomicPosition, repeatUnit):
+
+    """Scan insertion or deletion site for tandem repeats in both directions. The genomic position should be such that the repeatUnit completely overlaps with any segment of the tandem repeat region otherwise the function will not find it. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence (without context nucleotides)."""
+
+    repeatUnit = repeatUnit.strip().upper()
+
+    def scan5prime(chromosomeID, genomicPosition, repeatUnit):
+
+        """Scan insertion or deletion site for tandem repeats in the 5-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence."""
+
+        if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
+            genomicPosition -= 1
+            return(scan5prime( chromosomeID, genomicPosition, repeatUnit ))
+        else:
+            return( genomicPosition - len(repeatUnit) ) # returns position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
+            
+
+    def scan3prime(chromosomeID, genomicPosition, repeatUnit):
+
+        """Scan insertion or deletion site for tandem repeats in the 3-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence."""
 
 
-    if vcfPosValidator(chromosomeID, genomicPosition, refAllele):
-        genomicPosition -= 1
-        return(scan5prime( chromosomeID, genomicPosition, refAllele ))
-    else:
-        return( genomicPosition - len(refAllele) ) # position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
-        
+        if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
+            genomicPosition += 1
+            return(scan3prime( chromosomeID, genomicPosition, repeatUnit ))
+        else:
+            return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
 
-def scan3prime(chromosomeID, genomicPosition, refAllele):
-
-    """Scan insertion or deletion site for 3-prime repeats. It requires a 1-nt based genomic position as argument. """
-
-
-    if vcfPosValidator(chromosomeID, genomicPosition, refAllele):
-        genomicPosition += 1
-        return(scan3prime( chromosomeID, genomicPosition, refAllele ))
-    else:
-        return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
-
-
-
-def repeatScan ():
-
-    """Scan sequence context of insertion or deletion site for tandem repeats. It requires consistently shifted (either 5' or 3' shifted) insertion/deletion positions in the input file to report back consistent boundary position. VCFs are OK as they are 5' shifted. """
+    genomicPos1 = scan5prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
+    genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit) -1
+    repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
+#   print('repeatSequence:', repeatSequence, 'repeatUnit:', repeatUnit ) # for testing
+#   print ('Tandem-test 4:\t', 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' )  # for testing
+    print ( 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 
 def parseVCF( vcfFile ):
@@ -237,46 +268,59 @@ def parseVCF( vcfFile ):
 
 
 #refGenome = readRefGenome( genomeFilePath, True )
-refGenome = refGenomeRecord
-print('\nTesting reference genome parsing. Chromosomes to follow:')
-for keys in refGenome:
-    print ('\t', keys)
-print('\n')
+#refGenome = refGenomeRecord
+#print('\nTesting reference genome parsing. Chromosomes to follow:')
+#for keys in refGenome:
+#    print ('\t', keys)
+#print('\n')
 
-toTest = ( 'MT', 66, 'g')
-toTest = ( 'MT', 66, 'gg')
-toTest = ( 'MT', 68, 'gg')
-toTest = ( 'MT', 70, 'gg')
+#toTest = ( 'MT', 66, 'g')
+#toTest = ( 'MT', 66, 'gg')
+#toTest = ( 'MT', 68, 'gg')
+#toTest = ( 'MT', 70, 'gg')
+##toTest = ( 'MT', 69, 'gg')
+#toTest = ( 'MT', 305, 'cc')
+#toTest = ( 'MT', 303, 'c')
+#
 #toTest = ( 'MT', 69, 'gg')
-toTest = ( 'MT', 305, 'cc')
-toTest = ( 'MT', 303, 'c')
+#toTest = ( 'MT', 68, 'gg')
+#toTest = ( 'MT', 305, 'cc')
+#toTest = ( 'MT', 68, 'ggg')
+#toTest = ( 'MT', 69, 'gg')
+#
+#if vcfPosValidator( toTest[0], toTest[1], toTest[2] ):
+#    print( 'validated', toTest )
+#else:
+#    print('failed validation', toTest )
+#### 
+##repeatUnit = toTest[2].upper()
+##startG = scan5prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit)
+##endG = scan3prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit) -1
+###print('startG:', startG)
+###print('endG:', endG)
+##repeatCount = int((endG-startG) / len(repeatUnit))
+##endP = startG + len(repeatUnit) * repeatCount 
+##print ('Tandem-test 1:', toTest[0], ':', startG, endP, endG, repeatUnit, '*', repeatCount ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
+##print ('Tandem-test 2:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount, ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
+##
+##print(type(refGenomeRecord))
+##repeatCount2 = refGenomeRecord[toTest[0]][(startG) : (endG) ]
+##print( repeatCount2, repeatCount2.count(repeatUnit), repeatCount)
+##
+##print ('Tandem-test 3:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount2.count(repeatUnit), ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
-toTest = ( 'MT', 69, 'gg')
-toTest = ( 'MT', 68, 'gg')
-toTest = ( 'MT', 305, 'cc')
-toTest = ( 'MT', 68, 'ggg')
-toTest = ( 'MT', 69, 'gg')
-
-if vcfPosValidator( toTest[0], toTest[1], toTest[2] ):
-    print( 'validated', toTest )
-else:
-    print('failed validation', toTest )
-### 
-repeatUnit = toTest[2].upper()
-startG = scan5prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit)
-endG = scan3prime(toTest[0], toTest[1], toTest[2]) + len(repeatUnit) -1
-#print('startG:', startG)
-#print('endG:', endG)
-repeatCount = int((endG-startG) / len(repeatUnit))
-endP = startG + len(repeatUnit) * repeatCount 
-print ('Tandem-test 1:', toTest[0], ':', startG, endP, endG, repeatUnit, '*', repeatCount ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
-print ('Tandem-test 2:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount, ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
-
-print(type(refGenomeRecord))
-repeatCount2 = refGenomeRecord[toTest[0]][(startG) : (endG) ]
-print( repeatCount2, repeatCount2.count(repeatUnit), repeatCount)
-
-print ('Tandem-test 3:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount2.count(repeatUnit), ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
+print('\n')
+repeatScan( 'MT', 69, 'gg')
+repeatScan( 'MT', 305, 'cc')
+repeatScan( 'MT', 303, 'c')
+repeatScan( 'MT', 66, 'g')
+repeatScan( 'MT', 66, 'gg')
+repeatScan( 'MT', 68, 'gg')
+repeatScan( 'MT', 70, 'gg')
+repeatScan( 'MT', 68, 'gg')
+repeatScan( 'MT', 68, 'ggg')
+repeatScan( 'MT', 65, 'gg')
+repeatScan( 'MT', 66, 'gg')
 
 ######               #################################################
 ##################################################################################################################################
