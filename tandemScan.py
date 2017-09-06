@@ -149,28 +149,33 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
 def scan5prime(chromosomeID, genomicPosition, refAllele):
 
-    """Scan insertion or deletion site for 5-prime repeats. It requires consistently shifted (either 5' or 3' shifted) insertion/deletion positions in the input file to report back consistent boundary position. VCFs are OK as they are 5' shifted. """
+    """Scan insertion or deletion site for 5-prime repeats. It requires a 1-nt based genomic position as argument. """
 
 
     if vcfPosValidator(chromosomeID, genomicPosition, refAllele):
-        genomicPosition -= len(refAllele)
+        genomicPosition -= 1
         return(scan5prime( chromosomeID, genomicPosition, refAllele ))
     else:
-        return(genomicPosition-1) # converting to 0-start based nucleotide numbering
+        return( genomicPosition - len(refAllele) ) # position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
         
 
 def scan3prime(chromosomeID, genomicPosition, refAllele):
 
-    """Scan insertion or deletion site for 3-prime repeats. It requires consistently shifted (either 5' or 3' shifted) insertion/deletion positions in the input file to report back consistent boundary position. VCFs are OK as they are 5' shifted. """
+    """Scan insertion or deletion site for 3-prime repeats. It requires a 1-nt based genomic position as argument. """
 
 
     if vcfPosValidator(chromosomeID, genomicPosition, refAllele):
-        genomicPosition += len(refAllele)
+        genomicPosition += 1
         return(scan3prime( chromosomeID, genomicPosition, refAllele ))
     else:
-        return(genomicPosition-1) # converting to 0-start based nucleotide numbering
+        return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
 
-#def 
+
+
+def repeatScan ():
+
+    """Scan sequence context of insertion or deletion site for tandem repeats. It requires consistently shifted (either 5' or 3' shifted) insertion/deletion positions in the input file to report back consistent boundary position. VCFs are OK as they are 5' shifted. """
+
 
 def parseVCF( vcfFile ):
 
@@ -246,6 +251,12 @@ toTest = ( 'MT', 70, 'gg')
 toTest = ( 'MT', 305, 'cc')
 toTest = ( 'MT', 303, 'c')
 
+toTest = ( 'MT', 69, 'gg')
+toTest = ( 'MT', 68, 'gg')
+toTest = ( 'MT', 305, 'cc')
+toTest = ( 'MT', 68, 'ggg')
+toTest = ( 'MT', 69, 'gg')
+
 if vcfPosValidator( toTest[0], toTest[1], toTest[2] ):
     print( 'validated', toTest )
 else:
@@ -264,6 +275,8 @@ print ('Tandem-test 2:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeat
 print(type(refGenomeRecord))
 repeatCount2 = refGenomeRecord[toTest[0]][(startG) : (endG) ]
 print( repeatCount2, repeatCount2.count(repeatUnit), repeatCount)
+
+print ('Tandem-test 3:\t', 'g.', toTest[0], ':', startG, repeatUnit, '[', repeatCount2.count(repeatUnit), ']', sep='' ) # startG + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######               #################################################
 ##################################################################################################################################
