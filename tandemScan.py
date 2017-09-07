@@ -171,32 +171,33 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
     repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
 #   print('repeatSequence:', repeatSequence, 'repeatUnit:', repeatUnit ) # for testing
 #   print ('Tandem-test 4:\t', 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' )  # for testing
-    print ( 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
+#   print ( 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
+    return( ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatSequence.count(repeatUnit)), ']']) ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######################################################################
 
-def parseVCF( vcfFile ):
+def parseVCF( vcfFile, sampleID='test' ):
 
     """Read-in VCF file and parse it. It can handle uncompressed and gzip compressed VCF files as well."""
 
     try:
         vcf_reader = vcf.Reader(filename=vcfFile)
-        print(vcfFile)
+        print('\tVCF file:', vcfFile)
     except Exception as errVCF1:
         print('VCF error 1:', errVCF1)
         raise SystemExit
 
-    
-    try:
-   #    print(next(vcf_reader))
-#       print('samples:', vcf_reader.samples)
-        print('metadata:', vcf_reader.metadata)
-    #   print('filters:', vcf_reader.filters)
-    #   print('infos:', vcf_reader.infos)
-    except Exception as errVCF2:
-        print('VCF error 2:', errVCF2)
-        raise SystemExit
-
+#    
+#    try:
+#   #    print(next(vcf_reader))
+##       print('samples:', vcf_reader.samples)
+#        print('metadata:', vcf_reader.metadata)
+#    #   print('filters:', vcf_reader.filters)
+#    #   print('infos:', vcf_reader.infos)
+#    except Exception as errVCF2:
+#        print('VCF error 2:', errVCF2)
+#        raise SystemExit
+#
 
     
     try:
@@ -204,38 +205,66 @@ def parseVCF( vcfFile ):
             for n in record.ALT:
                 ref = str(record.REF).upper()
                 if ref.find(',') > -1 :
-                    raise ValueError ('ERROR: can not handle multiple reference alleles in VCFs', str(record) )
+#                   raise ValueError ('ERROR: can not handle multiple reference alleles in VCFs', str(record) ) # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what.
+                    continue # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what. Skip record, because it is not informative for the scope of the study this programme is part of.
                 alt = str(n).upper()
+#               chrom = record.CHROM
+                chrom = str(record.CHROM)
                 pos = record.POS
                 mutType = mutTyperVCF(ref, alt)
-#               if mutation type
-                print(pos, ref, alt, mutType)
+                if mutType == 'INS':
+                    if alt.startswith(ref): # Trim common suffix.
+                        if vcfPosValidator(chrom, pos, ref):
+                            validation = 'PASS'
+                        else:
+                            validation = 'FAIL'
+                        alt = alt[len(ref):]
+                        end = pos+len(ref)
+                        pos = end -1
+                        ref = '-'
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, end, alt) )
+                    else:
+                        raise ValueError ('ERROR: incorrect mutation type.')
+                elif mutType == 'DEL':
+                    if ref.startswith(alt): # Trim common suffix.
+                        ref = ref[len(alt):]
+                        alt = '-'
+                        end = pos + len(ref) -1
+                        if vcfPosValidator(chrom, pos, ref):
+                            validation = 'PASS'
+                        else:
+                            validation = 'FAIL'
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos, ref) )
+                    else:
+                        raise ValueError ('ERROR: incorrect mutation type.')
+                else:
+                    end = pos + len(ref)
+                    if vcfPosValidator(chrom, pos, ref):
+                        validation = 'PASS'
+                    else:
+                        validation = 'FAIL'
+                    print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA')
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
         raise SystemExit
-    ### Trim common suffix
-    # Trim a list of sequences by removing the longest common suffix while leaving all of them at least one character in length.
-
-
-
 
 
 ######################################################################
 ######    testing    #################################################
 
-print('\n')
-repeatScan( 'MT', 69, 'gg')
-repeatScan( 'MT', 305, 'cc')
-repeatScan( 'MT', 303, 'c')
-repeatScan( 'MT', 66, 'g')
-repeatScan( 'MT', 66, 'gg')
-repeatScan( 'MT', 68, 'gg')
-repeatScan( 'MT', 70, 'gg')
-repeatScan( 'MT', 68, 'gg')
-repeatScan( 'MT', 68, 'ggg')
-repeatScan( 'MT', 65, 'gg')
-repeatScan( 'MT', 66, 'gg')
+#print('\n')
+#repeatScan( 'MT', 69, 'gg')
+#repeatScan( 'MT', 305, 'cc')
+#repeatScan( 'MT', 303, 'c')
+#repeatScan( 'MT', 66, 'g')
+#repeatScan( 'MT', 66, 'gg')
+#repeatScan( 'MT', 68, 'gg')
+#repeatScan( 'MT', 70, 'gg')
+#repeatScan( 'MT', 68, 'gg')
+#repeatScan( 'MT', 68, 'ggg')
+#repeatScan( 'MT', 65, 'gg')
+#repeatScan( 'MT', 66, 'gg')
 
 ######               #################################################
 ##################################################################################################################################
