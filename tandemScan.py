@@ -3,7 +3,7 @@
 """ Read-in VCF file and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.1"
+__version__ = "0.2"
 
 #################################################################
 # Module to open compressed files
@@ -167,12 +167,16 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
             return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
 
     genomicPos1 = scan5prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
-    genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit) -1
+    if scan3prime(chromosomeID, genomicPosition, repeatUnit) > 0:
+        genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit) -1
+    else: # do not go beyond 5-prime end
+        genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
     repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
-#   print('repeatSequence:', repeatSequence, 'repeatUnit:', repeatUnit ) # for testing
-#   print ('Tandem-test 4:\t', 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' )  # for testing
-#   print ( 'g.', chromosomeID, ':', genomicPos1, repeatUnit, '[', repeatSequence.count(repeatUnit), ']', sep='' ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
-    return( ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatSequence.count(repeatUnit)), ']']) ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
+    repeatCount = str(repeatSequence.count(repeatUnit))
+#   return( ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', repeatCount), ']']) ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
+    mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', repeatCount, ']'] )
+    results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
+    return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######################################################################
 
@@ -185,7 +189,7 @@ def parseVCF( vcfFile, sampleID='test' ):
         print('\tVCF file:', vcfFile)
     except Exception as errVCF1:
         print('VCF error 1:', errVCF1)
-        raise SystemExit
+#       raise SystemExit
 
 #    
 #    try:
@@ -212,25 +216,32 @@ def parseVCF( vcfFile, sampleID='test' ):
                 chrom = str(record.CHROM)
                 pos = record.POS
                 mutType = mutTyperVCF(ref, alt)
+                if vcfPosValidator(chrom, pos, ref):
+                    validation = 'PASS'
+                else:
+                    validation = 'FAIL'
                 if mutType == 'INS':
                     if alt.startswith(ref): # Trim common suffix.
-                        if vcfPosValidator(chrom, pos, ref):
-                            validation = 'PASS'
-                        else:
-                            validation = 'FAIL'
+# 2Del                  if vcfPosValidator(chrom, pos, ref):
+# 2Del                      validation = 'PASS'
+# 2Del                  else:
+# 2Del                      validation = 'FAIL'
                         alt = alt[len(ref):]
                         end = pos+len(ref)
                         pos = end -1
                         ref = '-'
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, end, alt) )
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
-                elif mutType == 'DEL':
+                elif mutType == 'DEL': # NOTE: TESTED OK on 2017-09-08
                     if ref.startswith(alt): # Trim common suffix.
+                        ref0 = ref
+                        pos0 = pos
                         ref = ref[len(alt):]
+                        pos = pos + len(alt)
                         alt = '-'
                         end = pos + len(ref) -1
-                        if vcfPosValidator(chrom, pos, ref):
+                        if vcfPosValidator(chrom, pos0, ref0): #validate reference allele with context nucleotides
                             validation = 'PASS'
                         else:
                             validation = 'FAIL'
@@ -239,35 +250,15 @@ def parseVCF( vcfFile, sampleID='test' ):
                         raise ValueError ('ERROR: incorrect mutation type.')
                 else:
                     end = pos + len(ref)
-                    if vcfPosValidator(chrom, pos, ref):
-                        validation = 'PASS'
-                    else:
-                        validation = 'FAIL'
+# 2Del              if vcfPosValidator(chrom, pos, ref):
+# 2Del                  validation = 'PASS'
+# 2Del              else:
+# 2Del                  validation = 'FAIL'
                     print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA')
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
-        raise SystemExit
-
-
-######################################################################
-######    testing    #################################################
-
-#print('\n')
-#repeatScan( 'MT', 69, 'gg')
-#repeatScan( 'MT', 305, 'cc')
-#repeatScan( 'MT', 303, 'c')
-#repeatScan( 'MT', 66, 'g')
-#repeatScan( 'MT', 66, 'gg')
-#repeatScan( 'MT', 68, 'gg')
-#repeatScan( 'MT', 70, 'gg')
-#repeatScan( 'MT', 68, 'gg')
-#repeatScan( 'MT', 68, 'ggg')
-#repeatScan( 'MT', 65, 'gg')
-#repeatScan( 'MT', 66, 'gg')
-
-######               #################################################
-##################################################################################################################################
+#       raise SystemExit
 
 
 #################################################################
