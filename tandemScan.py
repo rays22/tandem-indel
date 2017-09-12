@@ -172,9 +172,9 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
     else: # do not go beyond 5-prime end
         genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
     repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
-    repeatCount = str(repeatSequence.count(repeatUnit))
+    repeatCount = repeatSequence.count(repeatUnit)
 #   return( ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', repeatCount), ']']) ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
-    mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', repeatCount, ']'] )
+    mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatCount), ']'] )
     results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
     return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
@@ -220,40 +220,53 @@ def parseVCF( vcfFile, sampleID='test' ):
                     validation = 'PASS'
                 else:
                     validation = 'FAIL'
+                ####################
                 if mutType == 'INS':
+                ####################
                     if alt.startswith(ref): # Trim common suffix.
-# 2Del                  if vcfPosValidator(chrom, pos, ref):
-# 2Del                      validation = 'PASS'
-# 2Del                  else:
-# 2Del                      validation = 'FAIL'
                         alt = alt[len(ref):]
-                        end = pos+len(ref)
-                        pos = end -1
+                        insertionStart = pos+len(ref) - 1
+                        insertionEnd = insertionStart + 1
                         ref = '-'
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
+                        repeatScanResults1 = repeatScan(chrom, insertionStart + 1, alt)
+                        shifted = repeatScanResults1[2] + ( ( repeatScanResults1[4] -1 ) * len(alt) ) 
+                        repeatScanResults2 = repeatScan(chrom, shifted, alt)
+                        pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for INS.
+                        end = pos + 1
+#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2 )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
-                elif mutType == 'DEL': # NOTE: TESTED OK on 2017-09-08
+                ####################
+                elif mutType == 'DEL': # NOTE: 2017-09-11, OK for even deletion in odd repeats, but fails non-homopolymer repeats:
+                ####################
+# test Ts3 9 10 GA - DEL FAIL ('g.Ts3:9GA[0]', 'Ts3', 9, 'GA', 0)
+# test Tst 9 10 GG - DEL PASS ('g.Tst:8GG[2]', 'Tst', 8, 'GG', 2)
                     if ref.startswith(alt): # Trim common suffix.
                         ref0 = ref
-                        pos0 = pos
+                        pos0 = pos # genomic position of REF allele with context nucleotides
                         ref = ref[len(alt):]
-                        pos = pos + len(alt)
-                        alt = '-'
-                        end = pos + len(ref) -1
-                        if vcfPosValidator(chrom, pos0, ref0): #validate reference allele with context nucleotides
-                            validation = 'PASS'
+                        pos1 = pos + len(alt) # genomic position of REF allele without context nucleotides
+                        repeatScanResults = repeatScan(chrom, pos1, ref)
+                        repeats = repeatScanResults[4]
+                        if repeats > 1: # if deletion affects repeat region
+                            pos = repeatScanResults[2] + 1
+                            end = repeatScanResults[2] + len(ref) # NOTE: do a 5-prime shift in repeat region so that equivalent alleles resulting from deletions at different positions can be identified. The 5-prime shift works better for VCF files than 3-prime shift, because VCF alleles are already 5-prime shifted. For example, compare the two shift methods when even number of nucleotides are deleted in regions that contain odd number of homo-nucleotides.
                         else:
-                            validation = 'FAIL'
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos, ref) )
+                            pos = pos1
+                            end = pos + len(ref) - 1
+#redundant              if vcfPosValidator(chrom, pos0, ref0): #validate reference allele with context nucleotides
+#redundant                  validation = 'PASS'
+#redundant              else:
+#redundant                  validation = 'FAIL'
+                        alt = '-'
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults)
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
+                ####################
                 else:
+                ####################
                     end = pos + len(ref)
-# 2Del              if vcfPosValidator(chrom, pos, ref):
-# 2Del                  validation = 'PASS'
-# 2Del              else:
-# 2Del                  validation = 'FAIL'
                     print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA')
 
     except Exception as errVCF3:
