@@ -3,7 +3,7 @@
 """ Read-in VCF file and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.2"
+__version__ = "0.3"
 
 #################################################################
 # Module to open compressed files
@@ -127,8 +127,6 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
     validated = False # set default value
 
-#   refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # use global variable
-
     refAllele = refAllele.upper() # convert string to uppercase
     yourSeqLength = len(refAllele)
     fetchedGenomic = refGenomeRecord[chromosomeID][(genomicPosition-1) : (genomicPosition - 1 + yourSeqLength) ] # this is the fetched genomic sequence
@@ -137,46 +135,6 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
     return(validated) 
 
-
-def repeatScan(chromosomeID, genomicPosition, repeatUnit):
-
-    """Scan insertion or deletion site for tandem repeats in both directions. The genomic position should be such that the repeatUnit completely overlaps with any segment of the tandem repeat region otherwise the function will not find it. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence (without context nucleotides)."""
-
-    repeatUnit = repeatUnit.strip().upper()
-
-    def scan5prime(chromosomeID, genomicPosition, repeatUnit):
-
-        """Scan insertion or deletion site for tandem repeats in the 5-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence."""
-
-        if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
-            genomicPosition -= 1
-            return(scan5prime( chromosomeID, genomicPosition, repeatUnit ))
-        else:
-            return( genomicPosition - len(repeatUnit) ) # returns position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
-            
-
-    def scan3prime(chromosomeID, genomicPosition, repeatUnit):
-
-        """Scan insertion or deletion site for tandem repeats in the 3-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence."""
-
-
-        if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
-            genomicPosition += 1
-            return(scan3prime( chromosomeID, genomicPosition, repeatUnit ))
-        else:
-            return( genomicPosition -1 ) # converting to 0-start based nucleotide numbering
-
-    genomicPos1 = scan5prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
-    if scan3prime(chromosomeID, genomicPosition, repeatUnit) > 0:
-        genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit) -1
-    else: # do not go beyond 5-prime end
-        genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
-    repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
-    repeatCount = repeatSequence.count(repeatUnit)
-#   return( ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', repeatCount), ']']) ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
-    mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatCount), ']'] )
-    results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
-    return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######################################################################
 
@@ -191,12 +149,10 @@ def repeatScan2(chromosomeID, genomicPosition, repeatUnit):
         """Scan insertion or deletion site for tandem repeats in the 5-prime direction. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence."""
 
         if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
-#           genomicPosition -= 1
             genomicPosition -= len(repeatUnit)
             return(scan5prime( chromosomeID, genomicPosition, repeatUnit ))
         else:
             return( genomicPosition + len(repeatUnit) ) # returns the position of the first nucleotide of a repeat using a 1-start based nucleotide numbering system
-# returns position of last nt before tandem repeat starts in 1-start based nucleotide numbering or repeat start in a 0-start based nt numbering system
             
 
     def scan3prime(chromosomeID, genomicPosition, repeatUnit):
@@ -205,25 +161,21 @@ def repeatScan2(chromosomeID, genomicPosition, repeatUnit):
 
 
         if vcfPosValidator(chromosomeID, genomicPosition, repeatUnit):
-#           genomicPosition += 1
             genomicPosition += len(repeatUnit)
             return(scan3prime( chromosomeID, genomicPosition, repeatUnit ))
         else:
             return( genomicPosition -1 ) # returns the position of the last nucleotide of a repeat using a 1-start based nucleotide numbering system.
 
     genomicPos1 = scan5prime(chromosomeID, genomicPosition, repeatUnit) - 1 # position of the nucleotide preceding the repeat-region
-#   print('genomicPos1:', genomicPos1, genomicPosition)
     if scan3prime(chromosomeID, genomicPosition, repeatUnit) > 0:
         genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit) -1
     else: # do not go beyond 5-prime end
         genomicPos2 = scan3prime(chromosomeID, genomicPosition, repeatUnit) + len(repeatUnit)
     repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 : genomicPos2]
     repeatSequence2 = refGenomeRecord[chromosomeID][genomicPos1 - len(repeatUnit) : genomicPos2] # look further upstream
-#   repeatSequence = refGenomeRecord[chromosomeID][genomicPos1 - len(repeatUnit) : genomicPos2 + len(repeatUnit)] # look further upstream and downstream
     repeatCount = repeatSequence.count(repeatUnit)
     repeatCount2 = repeatSequence2.count(repeatUnit)
     length = len(repeatUnit)
-#   print('repeatCount, repeatCount2:', repeatCount, repeatCount2)
     for i in range(length):
         if repeatCount2 > repeatCount:
             genomicPos1 -= 1
@@ -239,7 +191,7 @@ def repeatScan2(chromosomeID, genomicPosition, repeatUnit):
 
 ######################################################################
 
-def parseVCF( vcfFile, sampleID='test' ):
+def parseVCF( vcfFile, sampleID='testSample' ):
 
     """Read-in VCF file and parse it. It can handle uncompressed and gzip compressed VCF files as well."""
 
@@ -248,20 +200,6 @@ def parseVCF( vcfFile, sampleID='test' ):
         print('\tVCF file:', vcfFile)
     except Exception as errVCF1:
         print('VCF error 1:', errVCF1)
-#       raise SystemExit
-
-#    
-#    try:
-#   #    print(next(vcf_reader))
-##       print('samples:', vcf_reader.samples)
-#        print('metadata:', vcf_reader.metadata)
-#    #   print('filters:', vcf_reader.filters)
-#    #   print('infos:', vcf_reader.infos)
-#    except Exception as errVCF2:
-#        print('VCF error 2:', errVCF2)
-#        raise SystemExit
-#
-
     
     try:
        for record in vcf_reader:
@@ -287,23 +225,12 @@ def parseVCF( vcfFile, sampleID='test' ):
                         insertionStart = pos+len(ref) - 1
                         insertionEnd = insertionStart + 1
                         ref = '-'
-                        repeatScanResults1 = repeatScan(chrom, insertionStart + 1, alt)
                         repeatScanResults2 = repeatScan2(chrom, insertionStart + 1, alt)
                         if repeatScanResults2[4] == 0:
                             repeatScanResults2 = repeatScan2(chrom, insertionStart - len(ref), alt) # look upstream
-                        pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for INS.
+                        pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for DEL.
                         end = pos + 1
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2 )
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2, repeatScanResults3 )
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults2 )
-#                        repeatScanResults1 = repeatScan(chrom, insertionStart + 1, alt)
-#                        shifted = repeatScanResults1[2] + ( ( repeatScanResults1[4] -1 ) * len(alt) ) 
-#                        repeatScanResults2 = repeatScan(chrom, shifted, alt)
-#                        pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for INS.
-#                        end = pos + 1
-##                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
-#                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2 )
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults2, sep='\t' )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
@@ -314,8 +241,6 @@ def parseVCF( vcfFile, sampleID='test' ):
                         pos0 = pos # genomic position of REF allele with context nucleotides
                         ref = ref[len(alt):]
                         pos1 = pos + len(alt) # genomic position of REF allele without context nucleotides
-#                       repeatScanResults = repeatScan(chrom, pos1, ref)
-#                       repeatScanResults2 = repeatScan2(chrom, pos1, ref)
                         repeatScanResults = repeatScan2(chrom, pos1, ref)
                         repeats = repeatScanResults[4]
                         if repeats > 1: # if deletion affects repeat region
@@ -325,15 +250,14 @@ def parseVCF( vcfFile, sampleID='test' ):
                             pos = pos1
                             end = pos + len(ref) - 1
                         alt = '-'
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, repeatScanResults2)
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults)
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
                 else:
                 ####################
                     end = pos + len(ref) - 1
-                    print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA')
+                    print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA', sep='\t' )
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
@@ -342,8 +266,6 @@ def parseVCF( vcfFile, sampleID='test' ):
 
 #################################################################
 ######################## Read in a VCF file(s).
-
-print('\n####################### testing parseVCF #################################')
 
 parseVCF( fname )
 
