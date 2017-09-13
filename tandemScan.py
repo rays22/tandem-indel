@@ -289,10 +289,14 @@ def parseVCF( vcfFile, sampleID='test' ):
                         ref = '-'
                         repeatScanResults1 = repeatScan(chrom, insertionStart + 1, alt)
                         repeatScanResults2 = repeatScan2(chrom, insertionStart + 1, alt)
+                        if repeatScanResults2[4] == 0:
+                            repeatScanResults2 = repeatScan2(chrom, insertionStart - len(ref), alt) # look upstream
                         pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for INS.
                         end = pos + 1
 #                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScan(chrom, pos+1, alt), repeatScan(chrom, pos, alt) )
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2 )
+#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2 )
+#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults1, repeatScanResults2, repeatScanResults3 )
+                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults2 )
 #                        repeatScanResults1 = repeatScan(chrom, insertionStart + 1, alt)
 #                        shifted = repeatScanResults1[2] + ( ( repeatScanResults1[4] -1 ) * len(alt) ) 
 #                        repeatScanResults2 = repeatScan(chrom, shifted, alt)
