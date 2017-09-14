@@ -138,7 +138,7 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
 ######################################################################
 
-def repeatScan2(chromosomeID, genomicPosition, repeatUnit):
+def repeatScan(chromosomeID, genomicPosition, repeatUnit):
 
     """Scan insertion or deletion site for tandem repeats in both directions. The genomic position should be such that the repeatUnit completely overlaps with any segment of the tandem repeat region otherwise the function will not find it. It requires a reference genome chromosome/contig identifier and the genomic position based on numbering system where the first nucleotide is 1. The repeatUnit is a short nt sequence (without context nucleotides). Because it is intended to be used with VCF files (that provide 5-prime context nucleotides), it expects that the insertion and deletion site positions are NOT shifted to the 3-prime-most position."""
 
@@ -197,7 +197,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
 
     try:
         vcf_reader = vcf.Reader(filename=vcfFile)
-        print('\tVCF file:', vcfFile)
+#       print('\tVCF file:', vcfFile)
     except Exception as errVCF1:
         print('VCF error 1:', errVCF1)
     
@@ -213,10 +213,11 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                 chrom = str(record.CHROM)
                 pos = record.POS
                 mutType = mutTyperVCF(ref, alt)
-                if vcfPosValidator(chrom, pos, ref):
-                    validation = 'PASS'
+                if vcfPosValidator(chrom, pos, ref): # genomic position validation
+                    validation = 'PASS' # True # 'PASS'
                 else:
-                    validation = 'FAIL'
+                    validation = 'FAIL' # False # 'FAIL'
+                unitChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
                 ####################
                 if mutType == 'INS':
                 ####################
@@ -225,12 +226,18 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                         insertionStart = pos+len(ref) - 1
                         insertionEnd = insertionStart + 1
                         ref = '-'
-                        repeatScanResults2 = repeatScan2(chrom, insertionStart + 1, alt)
-                        if repeatScanResults2[4] == 0:
-                            repeatScanResults2 = repeatScan2(chrom, insertionStart - len(ref), alt) # look upstream
-                        pos = repeatScanResults2[2] # NOTE: do a 5-prime shift as for DEL.
+                        repeatScanResults = repeatScan(chrom, insertionStart + 1, alt)
+                        if repeatScanResults[4] == 0:
+                            repeatScanResults = repeatScan(chrom, insertionStart - len(ref), alt) # look upstream
+                        pos = repeatScanResults[2] # NOTE: do a 5-prime shift as for DEL.
                         end = pos + 1
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults2, sep='\t' )
+                        repeats = repeatScanResults[4]
+                        if validation: # ignore mutation records that have failed genomic position validation
+                            if repeats > 0: # 'repeats == 1' means duplication
+                                unitChange = True
+                        cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+                        print( sampleID, cosmicFormatted, validation, repeatScanResults, unitChange, sep='\t' )
+#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
@@ -241,23 +248,29 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                         pos0 = pos # genomic position of REF allele with context nucleotides
                         ref = ref[len(alt):]
                         pos1 = pos + len(alt) # genomic position of REF allele without context nucleotides
-                        repeatScanResults = repeatScan2(chrom, pos1, ref)
+                        repeatScanResults = repeatScan(chrom, pos1, ref)
                         repeats = repeatScanResults[4]
                         if repeats > 1: # if deletion affects repeat region
+                            unitChange = True
                             pos = repeatScanResults[2] + 1
                             end = repeatScanResults[2] + len(ref) # NOTE: do a 5-prime shift in repeat region so that equivalent alleles resulting from deletions at different positions can be identified. The 5-prime shift works better for VCF files than 3-prime shift, because VCF alleles are already 5-prime shifted. For example, compare the two shift methods when even number of nucleotides are deleted in regions that contain odd number of homo-nucleotides.
                         else:
                             pos = pos1
                             end = pos + len(ref) - 1
                         alt = '-'
-                        print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
+                        cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+                        print( sampleID, cosmicFormatted, validation, repeatScanResults, unitChange, sep='\t' )
+#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
                 else:
                 ####################
                     end = pos + len(ref) - 1
-                    print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA', sep='\t' )
+                    cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+                    rslts = ( 'NA','NA','NA','NA','NA' )
+                    print( sampleID, cosmicFormatted, validation, rslts, 'NA', sep='\t' )
+#                   print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA', sep='\t' )
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
@@ -267,5 +280,6 @@ def parseVCF( vcfFile, sampleID='testSample' ):
 #################################################################
 ######################## Read in a VCF file(s).
 
-parseVCF( fname )
-
+lastSlash = fname.rfind('/') + 1 # last slash in string
+samplename = fname[lastSlash:].rstrip('vcf.gz')
+parseVCF( fname, samplename )
