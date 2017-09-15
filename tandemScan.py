@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Read-in VCF file and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files."""
+""" Read-in VCF files and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files. The results are written out into a tsv file in the current working directory."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.3"
+__version__ = "0.5"
 
 #################################################################
 # Module to open compressed files
@@ -16,16 +16,18 @@ import vcf
 from argparse import ArgumentParser, RawTextHelpFormatter
 #import argparse
 ## Core tools for working with streams
+#from io import StringIO
 #import io
+from io import StringIO
 #################################################################
 
 # parse user input
 
-parser = ArgumentParser( description='Read-in VCF file and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files..', formatter_class=RawTextHelpFormatter )
+parser = ArgumentParser( description='Read-in VCF files (one for each tumour sample) from a csv file, convert mutation records to COSMIC format. In addition to these, check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files.', formatter_class=RawTextHelpFormatter )
 
 # positional argument
 parser.add_argument( 'reference_genome', help='Path to reference genome fasta file.' )
-parser.add_argument( 'vcf_file', help='Path to VCF input file.' )
+parser.add_argument( 'vcf_list', help='Path to VCF input file.' )
 
 # Optional argument
 parser.add_argument('-z', '--gzip', help='use gzip compressed fasta file', action='store_true')
@@ -37,9 +39,40 @@ isFastaCompressed = args.gzip
 
 ######################################################################
 
-# input filename and path
-fname = args.vcf_file
 genomeFilePath = args.reference_genome # get reference genome fasta file path from user input
+
+######################################################################
+### Read-in list of VCF files.
+# The input file is expected to contain the full path to the VCF file and the
+# corresponding sample name, one comma-separated filename-sample pair per line:
+# PATH/INPUT_FILE_VCF, FILENAME AND PATH
+######################################################################
+
+fname = args.vcf_list
+
+vcflist = list()
+delimiter = ',' # comma-separated values (csv)
+
+
+try:
+    with open(fname, 'rt') as fhandle:
+        for line in fhandle:
+            if line.startswith('#'): # ignore comment lines
+                continue
+            else:
+                words = line.split(delimiter)
+                vcfpath = words[0].strip()
+                sampleID = words[1].strip()
+                if len(sampleID) < 1:
+                    print('ERROR: Missing sample names!')
+                    raise SystemExit
+                vcflist.append( (vcfpath, sampleID) )
+except Exception as eVCF:
+    print('vcf_list ERROR:', eVCF)
+
+if len(vcflist) < 1: # check if VCF list is empty
+    print('ERROR: Check your list of VCF files!')
+    raise SystemExit
 
 ######################################################################
 
@@ -64,10 +97,8 @@ def readRefGenome( pathToFile, isCompressed):
                 return(chrDict1)
             else:
                 print('ERROR: Check your fasta file!')
-                raise SystemExit
         except Exception as e1:
             print('e1:', e1)
-            raise SystemExit
 
 
     if isCompressed:
@@ -76,14 +107,12 @@ def readRefGenome( pathToFile, isCompressed):
                 return(readFasta(handle))
         except Exception as e2:
             print('e2:', e2)
-            raise SystemExit
     else:
         try:
             with open(pathToFile, 'rt') as handle:
                 return(readFasta(handle))
         except Exception as e3:
             print('e3:', e3)
-            raise SystemExit
 
 def mutTyperVCF(refA, altA):
 
@@ -197,9 +226,26 @@ def parseVCF( vcfFile, sampleID='testSample' ):
 
     try:
         vcf_reader = vcf.Reader(filename=vcfFile)
-#       print('\tVCF file:', vcfFile)
     except Exception as errVCF1:
         print('VCF error 1:', errVCF1)
+
+    output= StringIO() # buffered stream as output
+    delimiter = '\t' # for output formatting
+    header = ( '#Sample identifier'
+             , 'CHR'
+             , 'START'
+             , 'STOP'
+             , 'REF'
+             , 'ALT'
+             , 'MUT_TYPE'
+             , 'Genomic Position Validation'
+             , 'Repeat-syntax'
+             , 'Repeat on chromosome'
+             , 'Repeat position'
+             , 'Repeat unit'
+             , 'Repeat count'
+             , 'Repeat change')
+    print( delimiter.join(header), file=output )
     
     try:
        for record in vcf_reader:
@@ -217,7 +263,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                     validation = 'PASS' # True # 'PASS'
                 else:
                     validation = 'FAIL' # False # 'FAIL'
-                unitChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
+                repeatChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
                 ####################
                 if mutType == 'INS':
                 ####################
@@ -234,10 +280,11 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                         repeats = repeatScanResults[4]
                         if validation: # ignore mutation records that have failed genomic position validation
                             if repeats > 0: # 'repeats == 1' means duplication
-                                unitChange = True
+                                repeatChange = True
                         cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-                        print( sampleID, cosmicFormatted, validation, repeatScanResults, unitChange, sep='\t' )
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
+                        cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
+                        repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
+                        print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
@@ -251,7 +298,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                         repeatScanResults = repeatScan(chrom, pos1, ref)
                         repeats = repeatScanResults[4]
                         if repeats > 1: # if deletion affects repeat region
-                            unitChange = True
+                            repeatChange = True
                             pos = repeatScanResults[2] + 1
                             end = repeatScanResults[2] + len(ref) # NOTE: do a 5-prime shift in repeat region so that equivalent alleles resulting from deletions at different positions can be identified. The 5-prime shift works better for VCF files than 3-prime shift, because VCF alleles are already 5-prime shifted. For example, compare the two shift methods when even number of nucleotides are deleted in regions that contain odd number of homo-nucleotides.
                         else:
@@ -259,8 +306,9 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                             end = pos + len(ref) - 1
                         alt = '-'
                         cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-                        print( sampleID, cosmicFormatted, validation, repeatScanResults, unitChange, sep='\t' )
-#                       print( sampleID, chrom, pos, end, ref, alt, mutType, validation, repeatScanResults, sep='\t' )
+                        cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
+                        repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
+                        print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
@@ -268,18 +316,22 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                 ####################
                     end = pos + len(ref) - 1
                     cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+                    cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
                     rslts = ( 'NA','NA','NA','NA','NA' )
-                    print( sampleID, cosmicFormatted, validation, rslts, 'NA', sep='\t' )
-#                   print( sampleID, chrom, pos, end, ref, alt, mutType, validation, 'NA', sep='\t' )
+                    print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(rslts), 'NA', sep=delimiter, file=output )
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
-#       raise SystemExit
 
+    contents = output.getvalue()
+    output.close()
+    outfileName = sampleID + '-out.tsv'
+    with open(outfileName, 'w') as f_out:
+        f_out.write(contents)
 
 #################################################################
 ######################## Read in a VCF file(s).
 
-lastSlash = fname.rfind('/') + 1 # last slash in string
-samplename = fname[lastSlash:].rstrip('vcf.gz')
-parseVCF( fname, samplename )
+# process VCF files
+for item in vcflist:
+    parseVCF( item[0], item[1] )
