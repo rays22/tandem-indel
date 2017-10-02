@@ -3,7 +3,7 @@
 """ Read-in VCF files and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files. The results are written out into a tsv file in the current working directory."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.5"
+__version__ = "0.6"
 
 #################################################################
 # Module to open compressed files
@@ -120,11 +120,11 @@ def mutTyperVCF(refA, altA):
 
     ### Sequence Ontology mutation type categories ###
     ######### and their COSMIC translations  #########
-    snv = 'SUB' #		SO:0001483
-    mnv = 'COMPLEX' #	SO:0002007
-    insertion = 'INS' #	SO:0000667
-    deletion = 'DEL' #	SO:0000159
-    indel = 'COMPLEX' #	SO:1000032
+    snv = 'SNV'  # COSMIC:'SUB' #		SO:0001483
+    mnv = 'MNV' # COSMIC:'COMPLEX' #	SO:0002007
+    insertion = 'insertion'  # COSMIC:'INS' #	SO:0000667
+    deletion = 'deletion' # COSMIC:'DEL' #	SO:0000159
+    indel = 'indel' # COSMIC:'COMPLEX' #	SO:1000032
 
     mut_type = 'ERROR: unexpected data format'
 
@@ -265,7 +265,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                     validation = 'FAIL' # False # 'FAIL'
                 repeatChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
                 ####################
-                if mutType == 'INS':
+                if mutType == 'insertion':
                 ####################
                     if alt.startswith(ref): # Trim common suffix.
                         alt = alt[len(ref):]
@@ -275,7 +275,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                         repeatScanResults = repeatScan(chrom, insertionStart + 1, alt)
                         if repeatScanResults[4] == 0:
                             repeatScanResults = repeatScan(chrom, insertionStart - len(ref), alt) # look upstream
-                        pos = repeatScanResults[2] # NOTE: do a 5-prime shift as for DEL.
+                        pos = repeatScanResults[2] # NOTE: do a 5-prime shift as for deletions.
                         end = pos + 1
                         repeats = repeatScanResults[4]
                         if validation: # ignore mutation records that have failed genomic position validation
@@ -288,7 +288,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
-                elif mutType == 'DEL': 
+                elif mutType == 'deletion': 
                 ####################
                     if ref.startswith(alt): # Trim common suffix.
                         ref0 = ref
