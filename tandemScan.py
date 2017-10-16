@@ -3,7 +3,7 @@
 """ Read-in VCF files and check genomic sequences upstream and downstream of insertion or deletion sites for tandem repeat expansion or reduction, respectively. Reference genome files must be fasta files. You can use compressed fasta.gz files. The results are written out into a tsv file in the current working directory."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.6"
+__version__ = "0.7"
 
 #################################################################
 # Module to open compressed files
@@ -256,7 +256,7 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                     continue # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what. Skip record, because it is not informative for the scope of the study this programme is part of.
                 alt = str(n).upper()
 #               chrom = record.CHROM
-                chrom = str(record.CHROM)
+                chrom = str(record.CHROM).upper().lstrip('CHR') # remove 'chr' before all chromosome values
                 pos = record.POS
                 mutType = mutTyperVCF(ref, alt)
                 if vcfPosValidator(chrom, pos, ref): # genomic position validation
