@@ -68,7 +68,7 @@ if iterations < 1:
 fname = args.csv
 
 delimiter = ',' # comma-separated values (csv)
-
+inputdata = []
 
 try:
     with open(fname, 'rt') as fhandle:
@@ -79,19 +79,19 @@ try:
                 words = line.split(delimiter)
                 chrm = words[0].strip()
                 posn = words[1].strip()
+                alll = words[2].strip()
 #NEMKELL#                alll = words[2].strip()
 #NEMKELL#                if len(sampleID) < 1:
 #NEMKELL#                    print('ERROR: Missing sample names!')
 #NEMKELL#                    raise SystemExit
-                for i in words:
-                    print(i)
+#               for i in words:
+#                   print(i)
+                inputdata.append( [chrm, posn, alll] )
 except Exception as eCSV:
     print('ERROR:', eCSV)
 
-if len(vcflist) < 1: # check if VCF list is empty
-    print('ERROR: Check your list of VCF files!')
-    raise SystemExit
-
+for i in inputdata:
+    print(i)
 ######################################################################
 ##############   works up to this point   ############################
 ######################################################################
