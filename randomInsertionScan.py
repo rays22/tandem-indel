@@ -10,8 +10,6 @@ __version__ = "0.1"
 import gzip
 # Import Biopython modules
 from Bio.SeqIO.FastaIO import SimpleFastaParser
-#NEMKELL## Module to parse VCF files
-#NEMKELL#import vcf
 # Import command-line parsing module from the Python standard library.
 from argparse import ArgumentParser, RawTextHelpFormatter
 #import argparse
@@ -23,7 +21,7 @@ from io import StringIO
 
 # parse user input
 
-parser = ArgumentParser( description='Read-in CSV FILE that contains three columns in the following order:\n 1. chromosome identifier, 2. genomic position, and 3. DNA sequence of corresponding insertion alleles.\n\n %(prog)s allows you to check if the inserted sequences are related to the genomic sequences surrounding the insertion sites. You can do this with the original insertions in the input file or by simulating insertions at randomised insertion sites based on the ones in your input. Here an insertion allele is defined as being related to the sequence surrounding the insertion site if it creates or expands a tandem repeat. Reference genome files must be fasta files. You can use compressed fasta.gz files as default.', formatter_class=RawTextHelpFormatter )
+parser = ArgumentParser( description='Read-in CSV FILE that contains three columns in the following order:\n 1. chromosome identifier, 2. genomic position, and 3. DNA sequence of corresponding insertion alleles.\n\n %(prog)s allows you to check if the inserted sequences are related to the genomic sequences surrounding the insertion sites. You can do this with the original insertions in the input file or by simulating insertions at randomised insertion sites based on the ones in your input. Here an insertion allele is defined as being related to the sequence surrounding the insertion site if it creates or expands a tandem repeat. Reference genome file must be either a fasta or a gzip compressed fasta.gz file.', formatter_class=RawTextHelpFormatter )
 
 # Limit the maximum number of allowed iterations:
 imax = 10
@@ -34,7 +32,8 @@ parser.add_argument( 'csv', help='Path to input CSV FILE.' )
 parser.add_argument( 'iterations', type=int, default=imax, help='Enter number of iterations to run (maximum %(default)s).' )
 
 # Optional argument
-parser.add_argument('-u', '--uncompressed', help='use uncompressed fasta file', action='store_true')
+#parser.add_argument('-u', '--uncompressed', help='use uncompressed fasta file', action='store_true')
+#parser.add_argument('-z', '--gzip', help='use gzip compressed fasta file', action='store_true')
 parser.add_argument('-i', '--inputScore', help='compute score for original input in addition to simulation scores', action='store_false')
 
 #IMPLEMENT OPTION: compute score for original input or not? (default = no)
@@ -42,7 +41,7 @@ parser.add_argument('-i', '--inputScore', help='compute score for original input
 args = parser.parse_args()
 
 # Is fasta file gzip compressed ? 
-isFastaCompressed = args.uncompressed
+#isFastaCompressed = args.gzip
 
 ######################################################################
 
@@ -50,9 +49,10 @@ genomeFilePath = args.reference_genome # get reference genome fasta file path fr
 
 ######################################################################
 ### Read-in input file
-# The input file is expected to contain the full path to the VCF file and the
-# corresponding sample name, one comma-separated filename-sample pair per line:
-# PATH/INPUT_FILE_VCF, FILENAME AND PATH
+# The input file is expected to contain the full path to the CSV file.
+# The comma separated values should correspond to these comlumns:
+#1. chromosome identifier, 2. genomic position, and 3. DNA sequence of corresponding insertion alleles
+# PATH/INPUT_FILE_CSV, FILENAME AND PATH
 ######################################################################
 
 iterations = args.iterations
@@ -77,24 +77,16 @@ try:
                 continue
             else:
                 words = line.split(delimiter)
-                chrm = words[0].strip()
-                posn = words[1].strip()
-                alll = words[2].strip()
-#NEMKELL#                alll = words[2].strip()
-#NEMKELL#                if len(sampleID) < 1:
-#NEMKELL#                    print('ERROR: Missing sample names!')
-#NEMKELL#                    raise SystemExit
-#               for i in words:
-#                   print(i)
+                chrm = words[0].strip() # chromosome
+                posn = words[1].strip() # genomic position
+                alll = words[2].strip().upper() # upper case allele sequence
                 inputdata.append( [chrm, posn, alll] )
 except Exception as eCSV:
     print('ERROR:', eCSV)
 
+### just for testing ###
 for i in inputdata:
     print(i)
-######################################################################
-##############   works up to this point   ############################
-######################################################################
 
 ######################################################################
 ########                    Functions                        #########
@@ -112,63 +104,48 @@ def readRefGenome( pathToFile, isCompressed):
         try:
             for title, seq in SimpleFastaParser(fileHandle):
                 kromosome = title.lstrip().split()[0] # this works only if first word in title is the chromosome name
-                chrDict1[kromosome] = seq.upper() # NOTE: convert sequence to uniform upper case:
+                chrDict1[kromosome] = seq.upper() # NOTE: convert sequence to uniform upper case
             if len(chrDict1) >0:
                 return(chrDict1)
             else:
                 print('ERROR: Check your fasta file!')
+#       except Exception as e1:
         except Exception as e1:
             print('e1:', e1)
 
 
     if isCompressed:
         try:
-            with gzip.open(pathToFile, 'rt') as handle:
+            with gzip.open(pathToFile, mode='rt') as handle:
                 return(readFasta(handle))
         except Exception as e2:
             print('e2:', e2)
     else:
-        try:
-            with open(pathToFile, 'rt') as handle:
-                return(readFasta(handle))
-        except Exception as e3:
-            print('e3:', e3)
+            try:
+                with open(pathToFile, mode='rt') as handle:
+                    return(readFasta(handle))
+            except Exception as e3:
+                print('e3:', e3)
 
-def mutTyperVCF(refA, altA):
+#####################################################
+# Try to determine if the fasta file gzip compressed.
+#####################################################
+try:
+    fastaFile = gzip.open(genomeFilePath, mode='rb')
+    fastaFile.peek(1) # check quickly if file is indeed a gzip compressed file
+    isFastaCompressed = True
+#   print('found a gzip compressed file')
+except OSError as e2b:
+    isFastaCompressed = False # found an uncompressed file
+#   print('e2b:', e2b)
 
-    """Return mutation type for allele pair from VCF file."""
 
-    ### Sequence Ontology mutation type categories ###
-    ######### and their COSMIC translations  #########
-    snv = 'SNV'  # COSMIC:'SUB' #		SO:0001483
-    mnv = 'MNV' # COSMIC:'COMPLEX' #	SO:0002007
-    insertion = 'insertion'  # COSMIC:'INS' #	SO:0000667
-    deletion = 'deletion' # COSMIC:'DEL' #	SO:0000159
-    indel = 'indel' # COSMIC:'COMPLEX' #	SO:1000032
 
-    mut_type = 'ERROR: unexpected data format'
-
-    if refA == altA:
-        mut_type = 'ERROR: unexpected data format' # this is not a mutation
-    elif altA == 'NONE':
-        mut_type = 'NA: monomorphic reference' # this is not a mutation
-    elif len(refA) == len(altA):
-        if len(refA) > 1:
-            mut_type = mnv # multiple-nucleotide substitution
-        elif len(refA) == 1:
-            mut_type = snv # or single-nucleotide substitution
-        else:
-            mut_type = 'ERROR: unexpected data format' # unexpected case
-    elif altA.startswith(refA): # VCF-style insertion
-        mut_type = insertion
-    elif refA.startswith(altA): # VCF-style deletion
-            mut_type = deletion
-    else:
-        mut_type = indel
-    return(mut_type)
+### just for testing ###
+print('isFastaCompressed:', isFastaCompressed)
 
 # Load reference genome into memory - subsequent functions use it repeatedly
-refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genomeFilePath and isFastaCompressed from user input
+refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genomeFilePath from user input
 
 def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
@@ -183,7 +160,6 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
         validated = True
 
     return(validated) 
-
 
 ######################################################################
 
@@ -238,6 +214,10 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
     results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
     return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
+######################################################################
+
+######################################################################
+##############   works up to this point   ############################
 ######################################################################
 
 def parseVCF( vcfFile, sampleID='testSample' ):
@@ -350,8 +330,3 @@ def parseVCF( vcfFile, sampleID='testSample' ):
         f_out.write(contents)
 
 #################################################################
-######################## Read in a VCF file(s).
-
-# process VCF files
-for item in vcflist:
-    parseVCF( item[0], item[1] )
