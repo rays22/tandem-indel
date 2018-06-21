@@ -17,6 +17,12 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 #from io import StringIO
 #import io
 from io import StringIO
+# This module is to help create a unique filename for the output
+from tempfile import mkstemp
+# to get formatted date for simple timestamps
+from datetime import date
+# this module is to get the name of the current script omitting the directory part
+from os import path
 #################################################################
 
 # parse user input
@@ -32,16 +38,12 @@ parser.add_argument( 'csv', help='Path to input CSV FILE.' )
 parser.add_argument( 'iterations', type=int, default=imax, help='Enter number of iterations to run (maximum %(default)s).' )
 
 # Optional argument
-#parser.add_argument('-u', '--uncompressed', help='use uncompressed fasta file', action='store_true')
-#parser.add_argument('-z', '--gzip', help='use gzip compressed fasta file', action='store_true')
 parser.add_argument('-i', '--inputScore', help='compute score for original input in addition to simulation scores', action='store_false')
 
 #IMPLEMENT OPTION: compute score for original input or not? (default = no)
 
 args = parser.parse_args()
 
-# Is fasta file gzip compressed ? 
-#isFastaCompressed = args.gzip
 
 ######################################################################
 
@@ -84,9 +86,45 @@ try:
 except Exception as eCSV:
     print('ERROR:', eCSV)
 
-### just for testing ###
+###########################################################################
+# get chromosome symbols for categories (a set of counters) from input data
+# count the total number of elements in each category
+###########################################################################
+
+
+ctgrs = dict() # dictionary of categories
+
 for i in inputdata:
-    print(i)
+    if i[0] not in ctgrs:
+        ctgrs[ i[0] ] = [1, 0] # initialise counters
+    else:
+        ctgrs[ i[0] ][0] += 1 # increment count
+
+
+formattedCtgs = dict()
+
+for key in ctgrs:
+    k = -1
+    try:
+        k = int(key)
+    except ValueError:
+#   except Exception as e1:
+#       print('error:', e1)
+        newKey = key
+    if 9 < k < 23:
+        newKey = ''.join(['chr', key ])
+    elif 0 < k < 10:
+        newKey = ''.join(['chr0', key ])
+    else:
+        newKey = key
+    formattedCtgs[newKey] = ctgrs[key]
+
+# just for testing # # just for testing
+# just for testing # for i in sorted(formattedCtgs): # just for testing
+# just for testing #     print(i, formattedCtgs[i]) # just for testing
+
+#print( sorted(formattedCtgs) )
+#categories = [ testType, ]
 
 ######################################################################
 ########                    Functions                        #########
@@ -140,9 +178,6 @@ except OSError as e2b:
 #   print('e2b:', e2b)
 
 
-
-### just for testing ###
-print('isFastaCompressed:', isFastaCompressed)
 
 # Load reference genome into memory - subsequent functions use it repeatedly
 refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genomeFilePath from user input
@@ -220,40 +255,20 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
 ##############   works up to this point   ############################
 ######################################################################
 
-def parseVCF( vcfFile, sampleID='testSample' ):
+def findTandemInsertions( insertionData, randomiseData=False ):
 
-    """Read-in VCF file and parse it. It can handle uncompressed and gzip compressed VCF files as well."""
+    """Scan insertion data for tandem repeats from list of lists that contains insertions positions and the corresponding sequences of inserted nucleotides (in case of insertions)."""
 
-    try:
-        vcf_reader = vcf.Reader(filename=vcfFile)
-    except Exception as errVCF1:
-        print('VCF error 1:', errVCF1)
+    if randomiseData:
+        testType = 'simulated' # 
+    else:
+        testType = 'original'
 
-    output= StringIO() # buffered stream as output
-    delimiter = '\t' # for output formatting
-    header = ( '#Sample identifier'
-             , 'CHR'
-             , 'START'
-             , 'STOP'
-             , 'REF'
-             , 'ALT'
-             , 'MUT_TYPE'
-             , 'Genomic Position Validation'
-             , 'Repeat-syntax'
-             , 'Repeat on chromosome'
-             , 'Repeat position'
-             , 'Repeat unit'
-             , 'Repeat count'
-             , 'Repeat change')
-    print( delimiter.join(header), file=output )
     
     try:
-       for record in vcf_reader:
+       for allele in vcf_reader:
             for n in record.ALT:
                 ref = str(record.REF).upper()
-                if ref.find(',') > -1 :
-#                   raise ValueError ('ERROR: can not handle multiple reference alleles in VCFs', str(record) ) # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what.
-                    continue # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what. Skip record, because it is not informative for the scope of the study this programme is part of.
                 alt = str(n).upper()
 #               chrom = record.CHROM
                 chrom = str(record.CHROM).upper().lstrip('CHR') # remove 'chr' before all chromosome values
@@ -288,45 +303,58 @@ def parseVCF( vcfFile, sampleID='testSample' ):
                     else:
                         raise ValueError ('ERROR: incorrect mutation type.')
                 ####################
-                elif mutType == 'deletion': 
-                ####################
-                    if ref.startswith(alt): # Trim common suffix.
-                        ref0 = ref
-                        pos0 = pos # genomic position of REF allele with context nucleotides
-                        ref = ref[len(alt):]
-                        pos1 = pos + len(alt) # genomic position of REF allele without context nucleotides
-                        repeatScanResults = repeatScan(chrom, pos1, ref)
-                        repeats = repeatScanResults[4]
-                        if repeats > 1: # if deletion affects repeat region
-                            repeatChange = True
-                            pos = repeatScanResults[2] + 1
-                            end = repeatScanResults[2] + len(ref) # NOTE: do a 5-prime shift in repeat region so that equivalent alleles resulting from deletions at different positions can be identified. The 5-prime shift works better for VCF files than 3-prime shift, because VCF alleles are already 5-prime shifted. For example, compare the two shift methods when even number of nucleotides are deleted in regions that contain odd number of homo-nucleotides.
-                        else:
-                            pos = pos1
-                            end = pos + len(ref) - 1
-                        alt = '-'
-                        cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-                        cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
-                        repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
-                        print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
-                    else:
-                        raise ValueError ('ERROR: incorrect mutation type.')
-                ####################
-                else:
-                ####################
-                    end = pos + len(ref) - 1
-                    cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-                    cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
-                    rslts = ( 'NA','NA','NA','NA','NA' )
-                    print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(rslts), 'NA', sep=delimiter, file=output )
 
     except Exception as errVCF3:
         print('VCF error 3:', errVCF3)
 
-    contents = output.getvalue()
-    output.close()
-    outfileName = sampleID + '-out.tsv'
-    with open(outfileName, 'w') as f_out:
-        f_out.write(contents)
+#   return( [testType, calculatedResults='OK'] )
+
+# just for testing
+def findTandemInsertionsTest( insertionData, randomiseData=False ): # just for testing
+    if randomiseData:
+        testType = 'simulated' # 
+    else:
+        testType = 'original'
+    return( testType ) # just for testing
 
 #################################################################
+output= StringIO() # buffered stream as output
+
+delimiter = '\t' # for output formatting (tsv)
+header = ( '#Test type'
+         , 'Chromosome'
+         , 'Repeat Altering'
+         , 'Total' )
+print( delimiter.join(header), file=output )
+
+finalResults = [] 
+while iterations > 0:
+    findTandemInsertions
+#   print('findTandemInsertions', iterations) # just for testing
+    finalResults.append( ['findTandemInsertions', iterations] ) 
+    iterations -= 1
+# just for testing # print( finalResults ) # just for testing
+
+## get testType from findTandemInsertions
+testDescription = findTandemInsertionsTest( 1 )
+#testDescription = findTandemInsertionsTest( 1, True)
+
+for i in sorted(formattedCtgs):
+    print(i, formattedCtgs[i] )
+    print( testDescription, i, formattedCtgs[i], file=output)
+
+
+###################################
+# write results into an output file
+###################################
+contents = output.getvalue()
+output.close()
+#outfileName = 'test01' + '-out.tsv'
+
+scriptname = path.basename(__file__) # get the name of the current script for the output filename
+myprefix = '-'.join( ['out', scriptname, date.today().strftime('%Y-%m-%d-')]) # this is for the output filename
+mysuffix = '.tsv' # this is for the output filename
+tempfile, path = mkstemp(suffix=mysuffix, prefix=myprefix, dir='./', text=True) # creates a unique output filename that will not be overwritten next time you run the script
+
+with open(tempfile, 'w') as f_out:
+    f_out.write(contents)
