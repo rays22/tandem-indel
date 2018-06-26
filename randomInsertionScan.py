@@ -86,46 +86,6 @@ try:
 except Exception as eCSV:
     print('ERROR:', eCSV)
 
-###########################################################################
-# get chromosome symbols for categories (a set of counters) from input data
-# count the total number of elements in each category
-###########################################################################
-
-
-ctgrs = dict() # dictionary of categories
-
-for i in inputdata:
-    if i[0] not in ctgrs:
-        ctgrs[ i[0] ] = [1, 0] # initialise counters
-    else:
-        ctgrs[ i[0] ][0] += 1 # increment count
-
-
-formattedCtgs = dict()
-
-for key in ctgrs:
-    k = -1
-    try:
-        k = int(key)
-    except ValueError:
-#   except Exception as e1:
-#       print('error:', e1)
-        newKey = key
-    if 9 < k < 23:
-        newKey = ''.join(['chr', key ])
-    elif 0 < k < 10:
-        newKey = ''.join(['chr0', key ])
-    else:
-        newKey = key
-    formattedCtgs[newKey] = ctgrs[key]
-
-# just for testing # # just for testing
-# just for testing # for i in sorted(formattedCtgs): # just for testing
-# just for testing #     print(i, formattedCtgs[i]) # just for testing
-
-#print( sorted(formattedCtgs) )
-#categories = [ testType, ]
-
 ######################################################################
 ########                    Functions                        #########
 ######################################################################
@@ -165,22 +125,7 @@ def readRefGenome( pathToFile, isCompressed):
             except Exception as e3:
                 print('e3:', e3)
 
-#####################################################
-# Try to determine if the fasta file gzip compressed.
-#####################################################
-try:
-    fastaFile = gzip.open(genomeFilePath, mode='rb')
-    fastaFile.peek(1) # check quickly if file is indeed a gzip compressed file
-    isFastaCompressed = True
-#   print('found a gzip compressed file')
-except OSError as e2b:
-    isFastaCompressed = False # found an uncompressed file
-#   print('e2b:', e2b)
-
-
-
-# Load reference genome into memory - subsequent functions use it repeatedly
-refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genomeFilePath from user input
+######################################################################
 
 def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
@@ -246,7 +191,8 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
         
 # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele:
     mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatCount), ']'] )
-    results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
+### results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
+    results = ( repeatCount )
     return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######################################################################
@@ -265,47 +211,32 @@ def findTandemInsertions( insertionData, randomiseData=False ):
         testType = 'original'
 
     
-    try:
-       for allele in vcf_reader:
-            for n in record.ALT:
-                ref = str(record.REF).upper()
-                alt = str(n).upper()
-#               chrom = record.CHROM
-                chrom = str(record.CHROM).upper().lstrip('CHR') # remove 'chr' before all chromosome values
-                pos = record.POS
-                mutType = mutTyperVCF(ref, alt)
-                if vcfPosValidator(chrom, pos, ref): # genomic position validation
-                    validation = 'PASS' # True # 'PASS'
-                else:
-                    validation = 'FAIL' # False # 'FAIL'
-                repeatChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
-                ####################
-                if mutType == 'insertion':
-                ####################
-                    if alt.startswith(ref): # Trim common suffix.
-                        alt = alt[len(ref):]
-                        insertionStart = pos+len(ref) - 1
-                        insertionEnd = insertionStart + 1
-                        ref = '-'
-                        repeatScanResults = repeatScan(chrom, insertionStart + 1, alt)
-                        if repeatScanResults[4] == 0:
-                            repeatScanResults = repeatScan(chrom, insertionStart - len(ref), alt) # look upstream
-                        pos = repeatScanResults[2] # NOTE: do a 5-prime shift as for deletions.
-                        end = pos + 1
-                        repeats = repeatScanResults[4]
-                        if validation: # ignore mutation records that have failed genomic position validation
-                            if repeats > 0: # 'repeats == 1' means duplication
-                                repeatChange = True
-                        cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-                        cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
-                        repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
-                        print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
-                    else:
-                        raise ValueError ('ERROR: incorrect mutation type.')
-                ####################
+    repeatChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
 
-    except Exception as errVCF3:
-        print('VCF error 3:', errVCF3)
+    ####################
+####if mutType == 'insertion':
+#   ####################
+#   if alt.startswith(ref): # Trim common suffix.
+#       alt = alt[len(ref):]
+
+    insertionStart = pos+len(ref) - 1
+    insertionEnd = insertionStart + 1
+#   ref = '-'
+    repeatScanResults = repeatScan(chrom, insertionStart + 1, alt)
+    if repeatScanResults[4] == 0:
+        repeatScanResults = repeatScan(chrom, insertionStart - len(ref), alt) # look upstream
+    pos = repeatScanResults[2] # NOTE: do a 5-prime shift as for deletions.
+    end = pos + 1
+    repeats = repeatScanResults[4]
+    if repeats > 0: # 'repeats == 1' means duplication
+        repeatChange = True
+
+    cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+    cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
+    repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
+    print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
+    ####################
+
 
 #   return( [testType, calculatedResults='OK'] )
 
@@ -317,14 +248,84 @@ def findTandemInsertionsTest( insertionData, randomiseData=False ): # just for t
         testType = 'original'
     return( testType ) # just for testing
 
+#####################################################
+# Try to determine if the fasta file gzip compressed.
+#####################################################
+try:
+    fastaFile = gzip.open(genomeFilePath, mode='rb')
+    fastaFile.peek(1) # check quickly if file is indeed a gzip compressed file
+    isFastaCompressed = True
+#   print('found a gzip compressed file')
+except OSError as e2b:
+    isFastaCompressed = False # found an uncompressed file
+#   print('e2b:', e2b)
+
+# Load reference genome into memory - subsequent functions use it repeatedly
+refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genomeFilePath from user input
+
+###########################################################################
+# get chromosome symbols for categories (a set of counters) from input data
+# count the total number of elements in each category
+###########################################################################
+
+
+ctgrs = dict() # dictionary of categories
+
+for i in inputdata:
+    if i[0] not in ctgrs:
+        ctgrs[ i[0] ] = 1 # initialise counters
+    else:
+        ctgrs[ i[0] ] += 1 # increment count
+
+
+# reformat dictionary keys for better sorting
+formattedCtgs = dict()
+
+for key in ctgrs:
+    k = -1
+    try:
+        k = int(key)
+    except ValueError:
+#   except Exception as e1:
+#       print('error:', e1)
+        newKey = key
+    if 9 < k < 23:
+        newKey = ''.join(['chr', key ])
+    elif 0 < k < 10:
+        newKey = ''.join(['chr0', key ])
+    else:
+        newKey = key
+    formattedCtgs[newKey] = ctgrs[key]
+
+# just for testing # # just for testing
+# just for testing # for i in sorted(formattedCtgs): # just for testing
+# just for testing #     print(i, formattedCtgs[i]) # just for testing
+
+
+
+##############################################################################
+# convert the dictionary of categories into a list of list to append more data
+##############################################################################
+# convert dictionary into list of lists
+chrmCategories = list( map( list, formattedCtgs.items() ) )
+# sort list of lists by first item in each list
+chrmCategories.sort(key= lambda x: x[0].lower())
+# initialise list with placeholder for first putative column 
+myColumns = [ ['#description', 'total'] ]
+# append chromosome categories and total counts
+for i in chrmCategories:
+    myColumns.append(i)
+
+
+
 #################################################################
 output= StringIO() # buffered stream as output
 
 delimiter = '\t' # for output formatting (tsv)
-header = ( '#Test type'
-         , 'Chromosome'
+header = ( '#Chromosome'
+         , 'Total'
          , 'Repeat Altering'
-         , 'Total' )
+         , 'Simulations' ) # repeat altering indel count of simulated data
 print( delimiter.join(header), file=output )
 
 finalResults = [] 
@@ -339,9 +340,29 @@ while iterations > 0:
 testDescription = findTandemInsertionsTest( 1 )
 #testDescription = findTandemInsertionsTest( 1, True)
 
-for i in sorted(formattedCtgs):
-    print(i, formattedCtgs[i] )
-    print( testDescription, i, formattedCtgs[i], file=output)
+## just for testing ## print( '#Description', delimiter.join( sorted(formattedCtgs, key=str.lower) ) )
+
+# placeholder list for transposed rows
+myRows = []
+
+### get table dimensions
+# 1. get number of rows to create by the transposition
+rowCount = len(myColumns[0]) # The item count should be the same for all list items and should have a minimum value of 2.
+# 2. get number of columns to create by the transposition
+columnCount = len(myColumns)
+# transpose table (which is a list of lists)
+for j in range(rowCount):
+    singleRow = []
+    for i in range(columnCount):
+        singleRow.append(myColumns[i][j])
+    myRows.append(singleRow)
+
+rslts1 = myRows
+
+# print('transposed table')
+for r in rslts1:
+    print(delimiter.join( map(str, r) ), file=output )
+
 
 
 ###################################
@@ -349,7 +370,6 @@ for i in sorted(formattedCtgs):
 ###################################
 contents = output.getvalue()
 output.close()
-#outfileName = 'test01' + '-out.tsv'
 
 scriptname = path.basename(__file__) # get the name of the current script for the output filename
 myprefix = '-'.join( ['out', scriptname, date.today().strftime('%Y-%m-%d-')]) # this is for the output filename
