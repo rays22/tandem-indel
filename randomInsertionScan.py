@@ -23,6 +23,8 @@ from tempfile import mkstemp
 from datetime import date
 # this module is to get the name of the current script omitting the directory part
 from os import path
+# Return a random element from the non-empty sequence.
+from random import choice
 #################################################################
 
 # parse user input
@@ -33,12 +35,12 @@ parser = ArgumentParser( description='Read-in CSV FILE that contains three colum
 imax = 10
 
 # positional argument
-parser.add_argument( 'reference_genome', help='Path to reference genome fasta file.' )
-parser.add_argument( 'csv', help='Path to input CSV FILE.' )
+parser.add_argument( 'REFERENCE_GENOME', help='Path to reference genome fasta file.' )
+parser.add_argument( 'CSV_FILE', help='Path to input CSV FILE.' )
 parser.add_argument( 'iterations', type=int, default=imax, help='Enter number of iterations to run (maximum %(default)s).' )
 
-# Optional argument
-parser.add_argument('-i', '--inputScore', help='compute score for original input in addition to simulation scores', action='store_false')
+## Optional argument
+#parser.add_argument('-i', '--inputScore', help='compute score for original input in addition to simulation scores', action='store_false')
 
 #IMPLEMENT OPTION: compute score for original input or not? (default = no)
 
@@ -47,7 +49,7 @@ args = parser.parse_args()
 
 ######################################################################
 
-genomeFilePath = args.reference_genome # get reference genome fasta file path from user input
+genomeFilePath = args.REFERENCE_GENOME # get reference genome fasta file path from user input
 
 ######################################################################
 ### Read-in input file
@@ -57,17 +59,17 @@ genomeFilePath = args.reference_genome # get reference genome fasta file path fr
 # PATH/INPUT_FILE_CSV, FILENAME AND PATH
 ######################################################################
 
-iterations = args.iterations
+iterationCount = args.iterations
 
-if iterations > imax:
+if iterationCount > imax:
     print('The number of requested iterations is too large. The maximum allowed value is:', imax ,  '.')
     raise SystemExit
 
-if iterations < 1:
+if iterationCount < 1:
     print('Iteration must be a natural number.')
     raise SystemExit
 
-fname = args.csv
+fname = args.CSV_FILE
 
 delimiter = ',' # comma-separated values (csv)
 inputdata = []
@@ -131,13 +133,20 @@ def vcfPosValidator ( chromosomeID, genomicPosition, refAllele ):
 
     """Validate reference allele sequence and position. The refGenomeRecord argument should refer to a dictionary of chromosome or contig names as keys and the corresponding sequences as values (uppercase strings). Nucleotide numbering: 1st base having position 1."""
 
-    validated = False # set default value
+#   validated = False # set default value
 
     refAllele = refAllele.upper() # convert string to uppercase
     yourSeqLength = len(refAllele)
-    fetchedGenomic = refGenomeRecord[chromosomeID][(genomicPosition-1) : (genomicPosition - 1 + yourSeqLength) ] # this is the fetched genomic sequence
+#   fetchedGenomic = refGenomeRecord[chromosomeID][(genomicPosition-1) : (genomicPosition - 1 + yourSeqLength) ] # this is the fetched genomic sequence
+    fetchedGenomic = dict()
+    try:
+        fetchedGenomic = refGenomeRecord[chromosomeID][(genomicPosition-1) : (genomicPosition - 1 + yourSeqLength) ] # this is the fetched genomic sequence
+    except KeyError:
+        validated = False
     if fetchedGenomic == refAllele:
         validated = True
+    else:
+        validated = False # set default value
 
     return(validated) 
 
@@ -191,8 +200,8 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
         
 # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele:
     mySyntax = ''.join( ['g.', chromosomeID, ':', str(genomicPos1), repeatUnit, '[', str(repeatCount), ']'] )
-### results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
-    results = ( repeatCount )
+    results = ( mySyntax, chromosomeID, genomicPos1, repeatUnit, repeatCount  )
+### results = ( repeatCount )
     return( results ) # genomicPos1 + repeatUnit, '*', repeatCount should reconstruct the reference allele
 
 ######################################################################
@@ -201,14 +210,10 @@ def repeatScan(chromosomeID, genomicPosition, repeatUnit):
 ##############   works up to this point   ############################
 ######################################################################
 
-def findTandemInsertions( insertionData, randomiseData=False ):
+def findTandemInsertions( chrom, pos, alt ):
+#def findTandemInsertions( insertionData, randomiseData=False ):
 
     """Scan insertion data for tandem repeats from list of lists that contains insertions positions and the corresponding sequences of inserted nucleotides (in case of insertions)."""
-
-    if randomiseData:
-        testType = 'simulated' # 
-    else:
-        testType = 'original'
 
     
     repeatChange = False # The effect of the variant on repeat-unit count ( True for gain or loss, False otherwise).
@@ -218,10 +223,9 @@ def findTandemInsertions( insertionData, randomiseData=False ):
 #   ####################
 #   if alt.startswith(ref): # Trim common suffix.
 #       alt = alt[len(ref):]
-
-    insertionStart = pos+len(ref) - 1
-    insertionEnd = insertionStart + 1
-#   ref = '-'
+    ref = '-' # default reference allele for all insertions
+    insertionStart = pos
+#   insertionEnd = insertionStart + 1
     repeatScanResults = repeatScan(chrom, insertionStart + 1, alt)
     if repeatScanResults[4] == 0:
         repeatScanResults = repeatScan(chrom, insertionStart - len(ref), alt) # look upstream
@@ -231,22 +235,18 @@ def findTandemInsertions( insertionData, randomiseData=False ):
     if repeats > 0: # 'repeats == 1' means duplication
         repeatChange = True
 
-    cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
-    cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
-    repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
-    print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
+#   cosmicFormatted = ( chrom, pos, end, ref, alt, mutType )
+#   cosmicFormatted = map( str, cosmicFormatted ) # convert to strings for printing
+#   repeatScanResults = map( str, repeatScanResults ) # convert to strings for printing
+#   print( sampleID, delimiter.join(cosmicFormatted), validation, delimiter.join(repeatScanResults), repeatChange, sep=delimiter, file=output )
     ####################
 
+    return( repeatChange )
 
-#   return( [testType, calculatedResults='OK'] )
 
 # just for testing
-def findTandemInsertionsTest( insertionData, randomiseData=False ): # just for testing
-    if randomiseData:
-        testType = 'simulated' # 
-    else:
-        testType = 'original'
-    return( testType ) # just for testing
+def findTandemInsertionsTest( chrom, pos, alt ): # just for testing
+    return( False ) # just for testing
 
 #####################################################
 # Try to determine if the fasta file gzip compressed.
@@ -270,12 +270,80 @@ refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genom
 
 
 ctgrs = dict() # dictionary of categories
+chromosomesPositions = dict() # original genomic insertion positions categorised by chromosomes
 
+############################################################################## 
+# calculate total insertion count and count of repeat altering insertions from original data
 for i in inputdata:
+    chrom = i[0]
+    pos = int(i[1])
+    alt = i[2]
+
     if i[0] not in ctgrs:
-        ctgrs[ i[0] ] = 1 # initialise counters
+        ctgrs[ i[0] ] = [1] # initialise counter for 'total'
+        chromosomesPositions[ i[0] ] = [pos] # initialise insertion site array for each chromosomes 
+        # initialise counter for repeat altering insertions for original data
+        if findTandemInsertions(chrom, pos, alt):
+            ctgrs[ i[0] ].append(1) # initialise counter for repeat altering insertions for original data
+        else:
+            ctgrs[ i[0] ].append(0) # initialise counter for repeat altering insertions for original data
     else:
-        ctgrs[ i[0] ] += 1 # increment count
+        ctgrs[ i[0] ][0] += 1 # increment count for total
+        chromosomesPositions[ i[0] ].append(pos) # initialise insertion site array for each chromosomes 
+        if findTandemInsertions(chrom, pos, alt):
+            ctgrs[ i[0] ][1] += 1 # increment count for repeat altering insertions for original data
+        else:
+            continue # do not increment count for repeat altering insertions for original data
+
+############################################################################## 
+### just for testing ###
+    print (chrom, pos, alt, ctgrs[i[0]])
+
+### just for testing ###
+print('\n', 'insertion positions on each chromosome')
+for key, in chromosomesPositions:
+    print(key, chromosomesPositions[key])
+print('\n')
+
+############################################################################## 
+# create placeholders for values calculated from simulated insertion data
+for i in range(iterationCount):
+    for key in ctgrs:
+        ctgrs[key].append(0)
+
+
+# The first two positions in the lists are already populated with the total insertion count and repeat-altering count. Any new data from the simulations should be appended after these two.
+indexShift = 2
+
+
+
+# calculate total insertion count and count of repeat altering insertions from simulated data
+for c in range(iterationCount):
+    for i in inputdata:
+        chrom = i[0]
+        try:
+            pos = choice( chromosomesPositions[ i[0] ] ) #shuffle insertion positions
+        except KeyError:
+            print('ERROR e1r: uninitialised chromosome dictionary!')
+        alt = i[2]
+        
+        if findTandemInsertions(chrom, pos, alt):
+            ctgrs[ i[0] ][indexShift + c] += 1 # increment count for repeat altering insertions for original data
+        else:
+            continue # do not increment count for repeat altering insertions for original data
+
+
+#### just for testing ###
+#    print (chrom, pos, alt, ctgrs[i[0]])
+
+### just for testing ###
+print('\n', 'results1')
+for key, in ctgrs:
+    print(key, ctgrs[key])
+print('\n')
+
+############################################################################## 
+
 
 
 # reformat dictionary keys for better sorting
@@ -311,7 +379,14 @@ chrmCategories = list( map( list, formattedCtgs.items() ) )
 # sort list of lists by first item in each list
 chrmCategories.sort(key= lambda x: x[0].lower())
 # initialise list with placeholder for first putative column 
-myColumns = [ ['#description', 'total'] ]
+myColumns = [ ['#description', 'total', 'original'] ]
+
+# add the optional number of simulation headers from user input
+for i in range(iterationCount):
+    myColumns[0].append('simulated')
+
+
+
 # append chromosome categories and total counts
 for i in chrmCategories:
     myColumns.append(i)
@@ -322,32 +397,22 @@ for i in chrmCategories:
 output= StringIO() # buffered stream as output
 
 delimiter = '\t' # for output formatting (tsv)
-header = ( '#Chromosome'
-         , 'Total'
-         , 'Repeat Altering'
-         , 'Simulations' ) # repeat altering indel count of simulated data
-print( delimiter.join(header), file=output )
 
-finalResults = [] 
-while iterations > 0:
-    findTandemInsertions
-#   print('findTandemInsertions', iterations) # just for testing
-    finalResults.append( ['findTandemInsertions', iterations] ) 
-    iterations -= 1
-# just for testing # print( finalResults ) # just for testing
+#finalResults = [] 
+#while iterationCount > 0:
+#    findTandemInsertions
+##   print('findTandemInsertions', iterationCount) # just for testing
+#    finalResults.append( ['findTandemInsertions', iterationCount] ) 
+#    iterationCount -= 1
+## just for testing # print( finalResults ) # just for testing
 
-## get testType from findTandemInsertions
-testDescription = findTandemInsertionsTest( 1 )
-#testDescription = findTandemInsertionsTest( 1, True)
-
-## just for testing ## print( '#Description', delimiter.join( sorted(formattedCtgs, key=str.lower) ) )
 
 # placeholder list for transposed rows
 myRows = []
 
 ### get table dimensions
 # 1. get number of rows to create by the transposition
-rowCount = len(myColumns[0]) # The item count should be the same for all list items and should have a minimum value of 2.
+rowCount = len(myColumns[1]) # The item count should be the same for all list items and should have a minimum value of 2.
 # 2. get number of columns to create by the transposition
 columnCount = len(myColumns)
 # transpose table (which is a list of lists)
@@ -357,10 +422,10 @@ for j in range(rowCount):
         singleRow.append(myColumns[i][j])
     myRows.append(singleRow)
 
-rslts1 = myRows
+firstThreeRows = myRows
 
 # print('transposed table')
-for r in rslts1:
+for r in firstThreeRows:
     print(delimiter.join( map(str, r) ), file=output )
 
 
