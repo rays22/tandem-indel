@@ -32,7 +32,7 @@ from random import choice
 parser = ArgumentParser( description='Read-in CSV FILE that contains three columns in the following order:\n 1. chromosome identifier, 2. genomic position, and 3. DNA sequence of corresponding insertion alleles.\n\n %(prog)s allows you to check if the inserted sequences are related to the genomic sequences surrounding the insertion sites. You can do this with the original insertions in the input file or by simulating insertions at randomised insertion sites based on the ones in your input. Here an insertion allele is defined as being related to the sequence surrounding the insertion site if it creates or expands a tandem repeat. Reference genome file must be either a fasta or a gzip compressed fasta.gz file.', formatter_class=RawTextHelpFormatter )
 
 # Limit the maximum number of allowed iterations:
-imax = 10
+imax = 32
 
 # positional argument
 parser.add_argument( 'REFERENCE_GENOME', help='Path to reference genome fasta file.' )
@@ -244,9 +244,9 @@ def findTandemInsertions( chrom, pos, alt ):
     return( repeatChange )
 
 
-# just for testing
-def findTandemInsertionsTest( chrom, pos, alt ): # just for testing
-    return( False ) # just for testing
+## just for testing
+#def findTandemInsertionsTest( chrom, pos, alt ): # just for testing
+#    return( False ) # just for testing
 
 #####################################################
 # Try to determine if the fasta file gzip compressed.
@@ -300,10 +300,10 @@ for i in inputdata:
     print (chrom, pos, alt, ctgrs[i[0]])
 
 ### just for testing ###
-print('\n', 'insertion positions on each chromosome')
-for key, in chromosomesPositions:
-    print(key, chromosomesPositions[key])
-print('\n')
+#print('\n', 'insertion positions on each chromosome')
+#for key, in chromosomesPositions:
+#    print(key, chromosomesPositions[key])
+#print('\n')
 
 ############################################################################## 
 # create placeholders for values calculated from simulated insertion data
@@ -336,11 +336,11 @@ for c in range(iterationCount):
 #### just for testing ###
 #    print (chrom, pos, alt, ctgrs[i[0]])
 
-### just for testing ###
-print('\n', 'results1')
-for key, in ctgrs:
-    print(key, ctgrs[key])
-print('\n')
+#### just for testing ###
+#print('\n', 'results1')
+#for key, in ctgrs:
+#    print(key, ctgrs[key])
+#print('\n')
 
 ############################################################################## 
 
