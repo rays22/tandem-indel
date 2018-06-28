@@ -25,6 +25,8 @@ from datetime import date
 from os import path
 # Return a random element from the non-empty sequence.
 from random import choice
+# Module to display time
+from time import strftime, gmtime
 #################################################################
 
 # parse user input
@@ -87,6 +89,10 @@ try:
                 inputdata.append( [chrm, posn, alll] )
 except Exception as eCSV:
     print('ERROR:', eCSV)
+
+#### just for testing ###
+# display time just to show that script is running and doing something
+print( strftime('1. Still running at %Y-%m-%d %H:%M:%S', gmtime()) )
 
 ######################################################################
 ########                    Functions                        #########
@@ -248,6 +254,11 @@ def findTandemInsertions( chrom, pos, alt ):
 #def findTandemInsertionsTest( chrom, pos, alt ): # just for testing
 #    return( False ) # just for testing
 
+
+#### just for testing ###
+# display time just to show that script is running and doing something
+print( strftime('2. Still running at %Y-%m-%d %H:%M:%S', gmtime()) )
+
 #####################################################
 # Try to determine if the fasta file gzip compressed.
 #####################################################
@@ -267,6 +278,11 @@ refGenomeRecord = readRefGenome( genomeFilePath, isFastaCompressed ) # get genom
 # get chromosome symbols for categories (a set of counters) from input data
 # count the total number of elements in each category
 ###########################################################################
+
+
+#### just for testing ###
+# display time just to show that script is running and doing something
+print( strftime('3. Still running at %Y-%m-%d %H:%M:%S', gmtime()) )
 
 
 ctgrs = dict() # dictionary of categories
@@ -296,8 +312,12 @@ for i in inputdata:
             continue # do not increment count for repeat altering insertions for original data
 
 ############################################################################## 
-### just for testing ###
-    print (chrom, pos, alt, ctgrs[i[0]])
+#### just for testing ###
+#    print (chrom, pos, alt, ctgrs[i[0]])
+
+#### just for testing ###
+# display time just to show that script is running and doing something
+print( strftime('4. Still running at %Y-%m-%d %H:%M:%S', gmtime()) )
 
 ### just for testing ###
 #print('\n', 'insertion positions on each chromosome')
@@ -379,17 +399,25 @@ chrmCategories = list( map( list, formattedCtgs.items() ) )
 # sort list of lists by first item in each list
 chrmCategories.sort(key= lambda x: x[0].lower())
 # initialise list with placeholder for first putative column 
-myColumns = [ ['#description', 'total', 'original'] ]
+#myColumns = [ '#description', ['total', 'original'] ]
+myFirstColumn = [ '#description', ['total', 'original'] ]
 
 # add the optional number of simulation headers from user input
 for i in range(iterationCount):
-    myColumns[0].append('simulated')
+    myFirstColumn[1].append('simulated')
 
-
+myColumns = [ myFirstColumn ]
 
 # append chromosome categories and total counts
 for i in chrmCategories:
     myColumns.append(i)
+
+#### just for testing ###
+print('myColumns')
+print(myColumns[0])
+print(myColumns[1])
+print(myColumns[2])
+
 
 
 
@@ -408,19 +436,81 @@ delimiter = '\t' # for output formatting (tsv)
 
 
 # placeholder list for transposed rows
-myRows = []
+myRows = [ [] ] # a list of lists
+
+################################################################
+#### Get table dimensions.
+## 1. Get the number of rows to create for the transposition. In more detail, gGet number of items in one of the 2 expected items from the list of lists to help create the required number of rows:
+#rowCount1 = len(myColumns[1]) # The item count should be the same for all list items and should have a minimum value of 2.
+## 2. get number of rows to create by the transposition
+#rowCount0 = len(myColumns[0]) # The item count should be the same for all list items and should have a minimum value of 2.
+## 2. get number of columns to create by the transposition
+#columnCount = len(myColumns)
+#
+##### just for testing ###
+#print('row count0:', rowCount0, 'row count1:', rowCount1, 'column count:', columnCount)
+#print(myColumns[0])
+##########################
+#
+## transpose table (which is a list of lists)
+#for j in range(2): # NOTE: there should be 2 items in myColumns
+#    singleRow = []
+#    for i in range(columnCount):
+#        singleRow.append(myColumns[i][j])
+#    myRows.append(singleRow)
+################################################################
+
 
 ### get table dimensions
 # 1. get number of rows to create by the transposition
-rowCount = len(myColumns[1]) # The item count should be the same for all list items and should have a minimum value of 2.
+rowCount = len(myColumns[0][1]) # The item count should be the same for all list items and should have a minimum value of 2.
 # 2. get number of columns to create by the transposition
 columnCount = len(myColumns)
+
+#### just for testing ###
+print('rowCount', rowCount, 'row count0:', len(myColumns[0][1]), 'row count1:', len(myColumns[1][1]), 'column count:', columnCount)
+#print(myColumns[0])
+
 # transpose table (which is a list of lists)
-for j in range(rowCount):
-    singleRow = []
-    for i in range(columnCount):
-        singleRow.append(myColumns[i][j])
-    myRows.append(singleRow)
+### make the first row
+for i in range(columnCount):
+    myRows[0].append(myColumns[i][0])
+
+
+#### just for testing ###
+print('initial myRows', myRows , '\n')
+#for i in myRows:
+#    print('items in myRows \n', i)
+
+# transpose table (which is a list of lists)
+#### make the first row
+#for i in range(columnCount):
+##   print('i', i)
+#    myRows.append(myColumns[i][0])
+
+# make placeholders for subsequent rows
+for i in range(rowCount):
+    myRows.append( [] )
+
+#### just for testing ###
+print('empty myRows with placeholders', myRows , '\n')
+#for i in myRows:
+#    print('items in myRows \n', i)
+
+for i in range(columnCount):
+#   print('i', i)
+    for j in range(rowCount):
+        myRows[j+1].append(myColumns[i][1][j])
+
+
+#for j in range(rowCount):
+##   print('j', j)
+#    singleRow = []
+##   for i in range(columnCount):
+#    for i in myColumns[j][1]
+##       print('i', i, 'j', j)
+#        singleRow.append(myColumns[i][1][i])
+#    myRows.append(singleRow)
 
 firstThreeRows = myRows
 
