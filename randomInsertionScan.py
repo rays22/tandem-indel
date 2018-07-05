@@ -3,7 +3,7 @@
 """ Take a tabulated file that contains columns chromosome identifier, genomic position, and DNA sequence of corresponding insertion alleles.  Check if the inserted sequences are related to the genomic sequences surrounding the insertion sites by simulating insertions at randomised insertion sites. In other words, use the insertion alleles from the input file, but shuffle the corresponding insertion sites observed for the set of insertions also from the file. An insertion allele is defined as related to the sequence surrounding the insertion site if it creates or expands a tandem repeat. Report the proportion of repeat-altering insertions for the set in the input file along with the results of a number of randomised iterations."""
 
 __author__  = "Ray Stefancsik"
-__version__ = "0.1"
+__version__ = "0.9"
 
 #################################################################
 # Module to open compressed files
@@ -400,6 +400,9 @@ rowCount = len(myColumns[0][1]) # The item count should be the same for all list
 columnCount = len(myColumns)
 
 #### just for testing ###
+# display time just to show that script is running and doing something
+print(scriptname, strftime('is still running at %Y-%m-%d %H:%M:%S', gmtime()), '(3)' )
+#### just for testing ###
 #print('rowCount:', rowCount, 'columnCount:', columnCount)
 print(scriptname, 'produced', rowCount, 'rows', columnCount, 'columns')
 #print(myColumns[0])
@@ -430,21 +433,9 @@ for i in range(columnCount):
         myRows[j+1].append(myColumns[i][1][j])
 
 
-#for j in range(rowCount):
-##   print('j', j)
-#    singleRow = []
-##   for i in range(columnCount):
-#    for i in myColumns[j][1]
-##       print('i', i, 'j', j)
-#        singleRow.append(myColumns[i][1][i])
-#    myRows.append(singleRow)
-
-firstThreeRows = myRows
-
 # print('transposed table')
-for r in firstThreeRows:
+for r in myRows:
     print(delimiter.join( map(str, r) ), file=output )
-
 
 
 ###################################
