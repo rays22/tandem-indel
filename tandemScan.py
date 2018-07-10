@@ -255,8 +255,8 @@ def parseVCF( vcfFile, sampleID='testSample' ):
 #                   raise ValueError ('ERROR: can not handle multiple reference alleles in VCFs', str(record) ) # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what.
                     continue # The VCF specification allows multiple reference alleles, but these were ambiguous with regards to which allele is changed to what. Skip record, because it is not informative for the scope of the study this programme is part of.
                 alt = str(n).upper()
-#               chrom = record.CHROM
-                chrom = str(record.CHROM).upper().lstrip('CHR') # remove 'chr' before all chromosome values
+                chrom = str(record.CHROM) # typecast it to str
+#               chrom = str(record.CHROM).upper().lstrip('CHR') # remove 'chr' before all chromosome values
                 pos = record.POS
                 mutType = mutTyperVCF(ref, alt)
                 if vcfPosValidator(chrom, pos, ref): # genomic position validation
